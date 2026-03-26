@@ -722,8 +722,8 @@ const CH_COLORS=['#4f8ef7','#30d158','#ff9f0a','#bf5af2','#ff453a','#ffd60a','#3
 let D={};
 function loadData(){try{const r=localStorage.getItem(SK);return r?JSON.parse(r):null;}catch{return null;}}
 function saveData(){
-  localStorage.setItem(SK,JSON.stringify(D));
-  driveSyncDebounced();
+  try{localStorage.setItem(SK,JSON.stringify(D));}catch(e){console.warn('localStorage non disponibile:',e);}
+  try{driveSyncDebounced();}catch(e){console.warn('Drive sync error:',e);}
 }
 function migrateData(d){
   // Future migrations go here. Example:
@@ -1083,7 +1083,8 @@ function saveTx(){
     }
   }
   window._pendingReceipts=[];
-  saveData();closeOvl('ovl-tx');
+  try{saveData();}catch(e){console.warn(e);}
+  closeOvl('ovl-tx');
   if(curScr==='dashboard')renderDash();
   if(curScr==='transactions')renderTxList();
   toast(txEditId?'✅ Transazione aggiornata':'✅ Transazione salvata');
@@ -1236,7 +1237,11 @@ function saveAcc(){
   }else{
     D.accounts.push({id:uid(),name,emoji:accEmSel,color:accClSel,initialBalance:bal});
   }
-  saveData();closeOvl('ovl-acc');renderAccSub();renderSettings();
+  try{saveData();}catch(e){console.warn(e);}
+  closeOvl('ovl-acc');
+  renderAccSub();
+  renderSettings();
+  if(curScr==='dashboard')renderDash();
   toast(accEditId?'✅ Conto aggiornato':'✅ Conto aggiunto');
 }
 function delAcc(){
