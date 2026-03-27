@@ -424,6 +424,11 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 
     <!-- DASHBOARD -->
     <div class="scr act" id="scr-dashboard">
+      <div id="profile-banner" style="display:none;margin:14px 14px 0;background:var(--acc-g);border:1px solid var(--acc);border-radius:var(--r);padding:13px 14px;display:flex;align-items:center;gap:12px;cursor:pointer;" onclick="navigate('sub-profile')">
+        <div style="font-size:22px">👤</div>
+        <div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--acc)">Completa il tuo profilo</div><div style="font-size:11px;color:var(--ts);margin-top:2px">Aggiungi il tuo nome per usarlo nei gruppi</div></div>
+        <div style="color:var(--acc);font-size:18px">›</div>
+      </div>
       <div class="bal-card">
         <div class="bal-lbl">PATRIMONIO NETTO</div>
         <div class="bal-amt" id="d-total">€0,00</div>
@@ -520,6 +525,11 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
     <!-- SETTINGS -->
     <div class="scr" id="scr-settings">
       <div style="padding:16px 14px 4px;font-size:22px;font-weight:800;letter-spacing:-1px;">Impostazioni</div>
+      <div class="set-grp"><div class="set-grp-ttl">Profilo</div>
+        <div class="set-list">
+          <div class="set-it" onclick="navigate('sub-profile')"><div class="set-ic" style="background:var(--acc-g)">👤</div><div class="set-tx"><div class="set-lbl">Anagrafica</div><div class="set-sub" id="s-profile">Non compilata</div></div><div class="set-arr">›</div></div>
+        </div>
+      </div>
       <div class="set-grp"><div class="set-grp-ttl">Finanze</div>
         <div class="set-list">
           <div class="set-it" onclick="navigate('sub-acc')"><div class="set-ic" style="background:var(--acc-g)">🏦</div><div class="set-tx"><div class="set-lbl">Conti</div><div class="set-sub" id="s-accs">0 conti</div></div><div class="set-arr">›</div></div>
@@ -558,6 +568,8 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 
     <!-- SUB: ACCOUNTS -->
     <div class="sub" id="sub-acc"><div class="sub-hdr"><div class="sub-hdr-back" onclick="goBack()">‹</div><div class="sub-hdr-title">Conti</div><div class="sub-hdr-act" onclick="openAccSh()">+</div></div><div class="sub-body" id="sub-acc-body"></div></div>
+    <!-- SUB: PROFILE -->
+    <div class="sub" id="sub-profile"><div class="sub-hdr"><div class="sub-hdr-back" onclick="goBack()">‹</div><div class="sub-hdr-title">Anagrafica</div></div><div class="sub-body" id="sub-profile-body"></div></div>
     <!-- SUB: CONTACTS -->
     <div class="sub" id="sub-contacts"><div class="sub-hdr"><div class="sub-hdr-back" onclick="goBack()">‹</div><div class="sub-hdr-title">Rubrica</div><div class="sub-hdr-act" onclick="openContactSh()">+</div></div><div class="sub-body" id="sub-contacts-body"></div></div>
     <!-- SUB: CATEGORIES -->
@@ -872,6 +884,21 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
   </div>
 </div>
 
+<!-- OVERLAY: GROUP TX PICKER (account + category for group transactions) -->
+<div class="ovl" id="ovl-grptx" onclick="ovlClick(event,'ovl-grptx')">
+  <div class="bsh">
+    <div class="sh-handle"></div>
+    <div class="sh-hdr"><div class="sh-ttl" id="sh-grptx-ttl">Registra transazione</div><div class="sh-cls" onclick="closeOvl('ovl-grptx')">✕</div></div>
+    <div class="fs">
+      <div style="background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);padding:12px 14px;" id="grptx-info"></div>
+      <div class="fg"><div class="flbl">Conto</div><div class="acc-sel" id="grptx-accs"></div></div>
+      <div class="fg"><div class="flbl">Categoria</div><div class="cat-grid" id="grptx-cats"></div></div>
+      <button class="btn btn-p" onclick="confirmGrpTx()">Registra</button>
+      <button class="btn btn-s" onclick="closeOvl('ovl-grptx')">Salta</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM -->
 <div class="ovl ovl-center" id="ovl-conf">
   <div class="conf-box">
@@ -927,7 +954,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 const SK='finanza_v1';
 const CLIENT_ID='472780980276-j7tadqv8v4f33thsnpkfhlggmrssmoee.apps.googleusercontent.com';
 const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
-const SCHEMA_VERSION=3;
+const SCHEMA_VERSION=4;
 const DRIVE_FILENAME='finanza_backup.json';
 const DEF_EXP_CATS=[
   {id:'ce1',name:'Cibo',emoji:'🍔',custom:false},{id:'ce2',name:'Ristorante',emoji:'🍽️',custom:false},
@@ -971,14 +998,28 @@ function migrateData(d){
     if(!d.groups)d.groups=[];
   }
   if((d.schemaVersion||1) < 3){
-    // Ensure all categories have custom flag and are editable
     if(d.categories){
       ['expense','income'].forEach(type=>{
         if(d.categories[type])d.categories[type].forEach(c=>{if(c.custom===undefined)c.custom=false;});
       });
     }
-    // Ensure contacts have phone/notes fields
     if(d.contacts)d.contacts.forEach(c=>{if(!c.phone)c.phone='';if(!c.notes)c.notes='';});
+  }
+  if((d.schemaVersion||1) < 4){
+    // Add profile
+    if(!d.profile)d.profile={firstName:'',lastName:'',phone:'',profileBannerDismissed:false};
+    // Fix group member keys — ensure g.me is set
+    if(d.groups)d.groups.forEach(g=>{if(!g.me)g.me=g.members[0]||'';});
+    // Remove double-counted exp.settlements (unify to g.settlements only)
+    if(d.groups)d.groups.forEach(g=>{
+      if(!g.settlements)g.settlements=[];
+      if(g.expenses)g.expenses.forEach(e=>{
+        if(e.settlements&&e.settlements.length){
+          g.settlements.push(...e.settlements);
+          e.settlements=[];
+        }
+      });
+    });
   }
   d.schemaVersion=SCHEMA_VERSION;
   return d;
@@ -993,7 +1034,8 @@ function initData(){
       {id:uid(),name:'Bancomat',emoji:'💳',color:'#4f8ef7',initialBalance:0}
     ],
     categories:{expense:[...DEF_EXP_CATS],income:[...DEF_INC_CATS]},
-    transactions:[],recurring:[],contacts:[],debts:[],groups:[]
+    transactions:[],recurring:[],contacts:[],debts:[],groups:[],
+    profile:{firstName:'',lastName:'',phone:'',profileBannerDismissed:false}
   };
   saveData();
 }
@@ -1275,6 +1317,7 @@ function navigate(sub){
   if(sub==='sub-curr')renderCurrSub();
   if(sub==='sub-pin')renderPinSub();
   if(sub==='sub-contacts')renderContactsSub();
+  if(sub==='sub-profile')renderProfileSub();
   if(sub==='sub-grpdetail'){
     const g=D.groups.find(x=>x.id===grpDetailId);
     if(g)document.getElementById('sub-grpdetail-title').textContent=g.name;
@@ -1289,6 +1332,12 @@ function goBack(){
 
 // ── DASHBOARD ──────────────────────────────────────────────────────────────
 function renderDash(){
+  // Profile banner
+  const pb=document.getElementById('profile-banner');
+  if(pb){
+    const p=D.profile||{};
+    pb.style.display=(!p.firstName&&!p.profileBannerDismissed)?'flex':'none';
+  }
   document.getElementById('d-total').textContent=fmt(totalBal());
   const{inc,exp}=moTotals();
   document.getElementById('d-inc').textContent=fmt(inc);
@@ -1861,7 +1910,9 @@ function renderSettings(){
   document.getElementById('s-recs').textContent=D.recurring.filter(r=>r.active).length+' attive';
   const c=CURRENCIES.find(x=>x.code===D.settings.currency)||CURRENCIES[0];
   document.getElementById('s-curr').textContent=c.sym+' '+c.code;
-  document.getElementById('s-pin').textContent=D.settings.pin?'PIN attivo':'PIN non impostato';
+  document.getElementById('s-pin').textContent=D.settings.pin?'PIN attivo ('+getPinLen()+' cifre)':'PIN non impostato';
+  const sp=document.getElementById('s-profile');
+  if(sp){const p=D.profile||{};sp.textContent=(p.firstName||p.lastName)?(p.firstName+' '+p.lastName).trim():'Non compilata';}
   document.getElementById('s-bgt').textContent=D.settings.budgetEnabled&&D.settings.budgetMonthly?fmt(D.settings.budgetMonthly)+'/mese':'Non impostato';
 }
 
@@ -2741,8 +2792,6 @@ function openSettleSh(id){
   document.getElementById('settle-person').textContent=(d.direction==='owed'?'Da: ':'A: ')+d.person;
   document.getElementById('settle-amt').value=fmtN(rem).replace(',','.');
   document.getElementById('settle-sym').textContent=getSym();
-  document.getElementById('settle-accs').innerHTML=D.accounts.map((a,i)=>`<div class="as-it${i===0?' sel':''}" onclick="selTrAcc('settle','{${a.id}}')"><span class="as-ic">${a.emoji}</span><span class="as-nm">${a.name}</span><span class="as-bl">${fmt(accBal(a.id))}</span></div>`).join('');
-  // fix sel
   document.getElementById('settle-accs').innerHTML=D.accounts.map((a,i)=>`<div class="as-it${i===0?' sel':''}" onclick="selSettleAcc('${a.id}')"><span class="as-ic">${a.emoji}</span><span class="as-nm">${a.name}</span><span class="as-bl">${fmt(accBal(a.id))}</span></div>`).join('');
   openOvl('ovl-settle');
 }
@@ -2759,14 +2808,18 @@ function settleDebt(){
   d.paid=(d.paid||0)+actual;
   if(!d.settlements)d.settlements=[];
   d.settlements.push({date:today(),amount:actual,accountId:accId});
-  // Register as income in the account if owed to me
+  const doneMsg=d.paid>=d.amount-0.001?'✅ Debito saldato completamente!':'✅ Saldo parziale — Residuo: '+fmt(d.amount-d.paid);
   if(d.direction==='owed'){
+    // Someone paid me — register income with Rimborso category
     const cat=D.categories.income.find(c=>c.id==='ci5')||D.categories.income[D.categories.income.length-1];
     D.transactions.push({id:uid(),type:'income',amount:actual,categoryId:cat.id,accountId:accId,date:today(),note:'Saldo da '+d.person,createdAt:Date.now(),receipts:[]});
+    saveData();closeOvl('ovl-settle');renderGroups();
+    toast(doneMsg);
+  }else{
+    // I owe someone — create expense tx, ask category
+    saveData();closeOvl('ovl-settle');
+    openGrpTxPicker('expense',actual,'Saldo a '+d.person,today(),(txId)=>{renderGroups();toast(doneMsg);});
   }
-  saveData();closeOvl('ovl-settle');renderGroups();
-  if(d.paid>=d.amount-0.001)toast('✅ Debito saldato completamente!');
-  else toast('✅ Saldo parziale registrato — Residuo: '+fmt(d.amount-d.paid));
 }
 
 // ── GROUPS ─────────────────────────────────────────────────────────────────
@@ -2801,22 +2854,22 @@ function calcGrpBalances(g){
   (g.expenses||[]).forEach(exp=>{
     const payer=exp.paidBy;
     const splits=exp.splits||{};
+    const totalSplit=Object.values(splits).reduce((a,b)=>a+Number(b),0);
+    // Each non-payer owes their share to the payer
+    // Payer credit = totalSplit - payerShare
     Object.entries(splits).forEach(([person,share])=>{
       if(person===payer)return;
-      bal[payer]=(bal[payer]||0)+share;
-      bal[person]=(bal[person]||0)-share;
-    });
-    // settle transactions
-    (exp.settlements||[]).forEach(s=>{
-      bal[s.from]=(bal[s.from]||0)+s.amount;
-      bal[s.to]=(bal[s.to]||0)-s.amount;
+      bal[payer]=(bal[payer]||0)+Number(share);
+      bal[person]=(bal[person]||0)-Number(share);
     });
   });
-  // apply group-level settlements
+  // Apply group-level settlements only (unified, no double-counting)
   (g.settlements||[]).forEach(s=>{
     bal[s.from]=(bal[s.from]||0)+s.amount;
     bal[s.to]=(bal[s.to]||0)-s.amount;
   });
+  // Round all balances to 2 decimals
+  Object.keys(bal).forEach(k=>bal[k]=Math.round(bal[k]*100)/100);
   return bal;
 }
 function calcSettlements(g,algo){
@@ -2846,10 +2899,15 @@ function calcSettlements(g,algo){
   }
   return txs;
 }
+function getMyName(){
+  const p=D.profile||{};
+  const full=(p.firstName+' '+p.lastName).trim();
+  return full||'Io';
+}
 function openGrpSh(id=null){
   grpEditId=id;
   const g=id?D.groups.find(x=>x.id===id):null;
-  grpMembers=g?[...g.members]:[];
+  grpMembers=g?[...g.members]:[getMyName()];
   const selEm=g?g.emoji:GRP_EMOJIS[0];
   document.getElementById('sh-grp-ttl').textContent=id?'Modifica gruppo':'Nuovo gruppo';
   document.getElementById('grp-del-btn').style.display=id?'':'none';
@@ -2884,7 +2942,7 @@ function saveGrp(){
     const g=D.groups.find(x=>x.id===grpEditId);
     if(g)Object.assign(g,{name,emoji:getSelGrpEm(),members:grpMembers});
   }else{
-    D.groups.push({id:uid(),name,emoji:getSelGrpEm(),members:grpMembers,me:grpMembers[0],expenses:[],settlements:[],archived:false,createdAt:Date.now()});
+    D.groups.push({id:uid(),name,emoji:getSelGrpEm(),members:grpMembers,me:getMyName(),expenses:[],settlements:[],archived:false,createdAt:Date.now()});
   }
   saveData();closeOvl('ovl-grp');renderGroups();
   toast(grpEditId?'✅ Gruppo aggiornato':'✅ Gruppo creato');
@@ -2912,6 +2970,14 @@ function renderGrpDetail(){
   const b=document.getElementById('sub-grpdetail-body');
   const balances=calcGrpBalances(g);
   const settlements=calcSettlements(g,grpAlgo);
+  // My summary
+  const meKey=getMyName();
+  const myBal=balances[meKey]||0;
+  const myBalHtml=`<div style="margin:10px 14px 0;background:${myBal>0.001?'var(--inc-g)':myBal<-0.001?'var(--exp-g)':'var(--sf2)'};border:1px solid ${myBal>0.001?'var(--inc)':myBal<-0.001?'var(--exp)':'var(--bd)'};border-radius:var(--r);padding:12px 14px;display:flex;align-items:center;gap:10px;">
+    <div style="font-size:22px">${myBal>0.001?'📥':myBal<-0.001?'📤':'✅'}</div>
+    <div style="flex:1"><div style="font-size:12px;color:var(--ts)">${myBal>0.001?'Ti devono in totale':myBal<-0.001?'Devi in totale':'Sei in pareggio'}</div>
+    <div style="font-size:20px;font-weight:800;color:${myBal>0.001?'var(--inc)':myBal<-0.001?'var(--exp)':'var(--tt)'}">${myBal>0.001?'+':''}${fmt(myBal)}</div></div>
+  </div>`;
   // Settle rows
   const settleHtml=settlements.length?`
     <div style="padding:10px 14px 4px;font-size:11px;font-weight:700;color:var(--tt);text-transform:uppercase;letter-spacing:.8px">Da saldare</div>
@@ -2928,10 +2994,13 @@ function renderGrpDetail(){
       ${Object.entries(balances).map(([n,v])=>`<div class="debt-dir-row"><span class="debt-dir-name">${n}</span><span class="debt-dir-amt ${v>0.001?'pos':v<-0.001?'neg':''}">${v>0.001?'+':''}${fmt(v)}</span></div>`).join('')}
     </div>`;
   // Expenses
+  const settlementsLog=(g.settlements||[]);
+  const histHtml=settlementsLog.length?`<div style="padding:10px 14px 4px;font-size:11px;font-weight:700;color:var(--tt);text-transform:uppercase;letter-spacing:.8px">Storico saldi</div>
+    <div class="card" style="margin:0 14px">`+settlementsLog.map(s=>`<div class="txi"><div class="txi-ic income">💸</div><div class="txi-info"><div class="txi-cat">${s.from} → ${s.to}</div><div class="txi-meta">${s.date}</div></div><div class="txi-amt income">+${fmt(s.amount)}</div></div>`).join('')+'</div>':'';
   const expHtml=`<div style="padding:10px 14px 4px;font-size:11px;font-weight:700;color:var(--tt);text-transform:uppercase;letter-spacing:.8px">Spese</div>
     ${g.archived?'':'<div style="margin:0 14px 8px"><button class="btn btn-p" style="padding:9px" onclick="openGrpExpSh(null)">+ Aggiungi spesa</button></div>'}
     ${(g.expenses||[]).length?'<div class="card" style="margin:0 14px">'+g.expenses.map(e=>grpExpRow(e,g)).join('')+'</div>':'<div class="empty" style="padding:24px"><div class="empty-ic">🧾</div><div class="empty-ttl">Nessuna spesa</div></div>'}`;
-  b.innerHTML=settleHtml+balHtml+expHtml;
+  b.innerHTML=myBalHtml+settleHtml+balHtml+expHtml+histHtml;
 }
 function grpExpRow(e,g){
   const splits=e.splits||{};
@@ -2967,18 +3036,25 @@ function openGrpExpSh(expId){
   openOvl('ovl-grpexp');
 }
 function selGrpPayer(name){document.querySelectorAll('#grpexp-payers .as-it').forEach(el=>el.classList.toggle('sel',el.textContent===name));}
+function getSplitExp(){
+  if(!grpExpEditId||!grpDetailId)return null;
+  const g=D.groups.find(x=>x.id===grpDetailId);
+  return g?g.expenses.find(e=>e.id===grpExpEditId):null;
+}
 function setSplitMode(mode,exp){
   grpSplitMode=mode;
   document.getElementById('split-eq-btn').classList.toggle('act',mode==='equal');
   document.getElementById('split-cu-btn').classList.toggle('act',mode==='custom');
   const g=D.groups.find(x=>x.id===grpDetailId);if(!g)return;
   const splits=document.getElementById('grpexp-splits');
+  // Always try to get current exp if not passed
+  const curExp=exp||getSplitExp();
   if(mode==='equal'){
     const amt=parseFloat(document.getElementById('grpexp-amt').value)||0;
-    const share=g.members.length>0?amt/g.members.length:0;
+    const share=g.members.length>0?Math.floor((amt/g.members.length)*100)/100:0;
     splits.innerHTML=g.members.map(m=>`<div class="split-row"><span class="split-nm">${m}</span><span style="color:var(--ts);font-size:13px">${fmt(share)}</span></div>`).join('');
   }else{
-    const prevSplits=exp?exp.splits:{};
+    const prevSplits=curExp?curExp.splits:{};
     splits.innerHTML=g.members.map(m=>`<div class="split-row"><span class="split-nm">${m}</span><input class="split-inp" type="number" id="split-${m.replace(/\s/g,'_')}" value="${prevSplits[m]||''}" placeholder="0,00" step="0.01" inputmode="decimal"></div>`).join('');
   }
 }
@@ -2996,8 +3072,13 @@ function saveGrpExp(){
   const txId=document.getElementById('grpexp-txlink').value||null;
   let splits={};
   if(grpSplitMode==='equal'){
-    const share=Math.round((amt/g.members.length)*100)/100;
-    g.members.forEach(m=>splits[m]=share);
+    // Distribute remainder to payer to avoid rounding gaps
+    const payerEl=document.querySelector('#grpexp-payers .as-it.sel');
+    const payer=payerEl?payerEl.textContent:g.members[0];
+    const base=Math.floor((amt/g.members.length)*100)/100;
+    const remainder=Math.round((amt-base*g.members.length)*100)/100;
+    g.members.forEach(m=>splits[m]=base);
+    if(splits[payer]!==undefined)splits[payer]=Math.round((splits[payer]+remainder)*100)/100;
   }else{
     let total=0;
     g.members.forEach(m=>{const key='split-'+m.replace(/\s/g,'_');const el=document.getElementById(key);const v=parseFloat(el?.value)||0;splits[m]=v;total+=v;});
@@ -3007,20 +3088,76 @@ function saveGrpExp(){
   if(grpExpEditId){
     const e=g.expenses.find(x=>x.id===grpExpEditId);
     if(e)Object.assign(e,{desc,paidBy,splits,date,txId,splitMode:grpSplitMode});
+    saveData();closeOvl('ovl-grpexp');renderGrpDetail();
+    toast('✅ Spesa aggiornata');
   }else{
-    g.expenses.push({id:uid(),desc,paidBy,splits,date,txId,splitMode:grpSplitMode,settlements:[]});
+    const expId=uid();
+    g.expenses.push({id:expId,desc,paidBy,splits,date,txId:null,splitMode:grpSplitMode,settlements:[],linkedTxId:null});
+    saveData();closeOvl('ovl-grpexp');
+    const meKey=getMyName();
+    if(paidBy===meKey){
+      // I'm the payer — ask account + category for full amount
+      openGrpTxPicker('expense',amt,'Spesa gruppo: '+desc+' ('+g.name+')',date,(newTxId)=>{
+        const exp=g.expenses.find(e=>e.id===expId);
+        if(exp)exp.linkedTxId=newTxId;
+        saveData();renderGrpDetail();
+      });
+    }else{
+      // I'm not the payer — no tx now, will be created when I settle
+      renderGrpDetail();
+      toast('✅ Spesa aggiunta');
+    }
   }
-  saveData();closeOvl('ovl-grpexp');renderGrpDetail();
-  toast(grpExpEditId?'✅ Spesa aggiornata':'✅ Spesa aggiunta');
 }
 function delGrpExp(){
   const g=D.groups.find(x=>x.id===grpDetailId);if(!g)return;
-  confirm2('Elimina spesa','La spesa verrà rimossa dal gruppo.',()=>{
+  const exp=g.expenses.find(e=>e.id===grpExpEditId);
+  const hasLinked=exp&&exp.linkedTxId;
+  const msg=hasLinked?'La spesa e la transazione collegata verranno eliminate.':'La spesa verrà rimossa dal gruppo.';
+  confirm2('Elimina spesa',msg,()=>{
+    if(hasLinked){
+      D.transactions=D.transactions.filter(t=>t.id!==exp.linkedTxId);
+    }
     g.expenses=g.expenses.filter(e=>e.id!==grpExpEditId);
     saveData();closeOvl('ovl-grpexp');renderGrpDetail();toast('🗑️ Spesa eliminata');
   });
 }
 let grpSettleData=null;
+let grpTxData=null; // {type:'expense'|'income', amount, note, date, callback}
+function openGrpTxPicker(type, amount, note, date, callback){
+  grpTxData={type,amount,note,date,callback};
+  const sym=getSym();
+  document.getElementById('sh-grptx-ttl').textContent=type==='expense'?'Registra uscita':'Registra entrata';
+  document.getElementById('grptx-info').innerHTML=`
+    <div style="font-size:11px;color:var(--ts);margin-bottom:4px">${type==='expense'?'Spesa da registrare':'Entrata da registrare'}</div>
+    <div style="font-size:20px;font-weight:800;color:${type==='expense'?'var(--exp)':'var(--inc)'}">${type==='expense'?'-':'+'}${fmt(amount)}</div>
+    <div style="font-size:12px;color:var(--tt);margin-top:3px">${note}</div>`;
+  // Accounts
+  document.getElementById('grptx-accs').innerHTML=D.accounts.map((a,i)=>`<div class="as-it${i===0?' sel':''}" onclick="selGrpTxAcc('${a.id}')"><span class="as-ic">${a.emoji}</span><span class="as-nm">${a.name}</span><span class="as-bl">${fmt(accBal(a.id))}</span></div>`).join('');
+  // Categories
+  const cats=type==='expense'?D.categories.expense:D.categories.income;
+  document.getElementById('grptx-cats').innerHTML=cats.map((c,i)=>`<div class="cat-it${i===0?' sel':''}" onclick="selGrpTxCat('${c.id}')"><span class="ce">${c.emoji}</span><span class="cn">${c.name}</span></div>`).join('');
+  openOvl('ovl-grptx');
+}
+function selGrpTxAcc(id){document.querySelectorAll('#grptx-accs .as-it').forEach(el=>el.classList.toggle('sel',el.getAttribute('onclick').includes("'"+id+"'")));}
+function selGrpTxCat(id){document.querySelectorAll('#grptx-cats .cat-it').forEach(el=>el.classList.toggle('sel',el.getAttribute('onclick').includes("'"+id+"'")));}
+function confirmGrpTx(){
+  if(!grpTxData)return;
+  const accEl=document.querySelector('#grptx-accs .as-it.sel');
+  const catEl=document.querySelector('#grptx-cats .cat-it.sel');
+  if(!accEl){toast('⚠️ Seleziona un conto');return;}
+  if(!catEl){toast('⚠️ Seleziona una categoria');return;}
+  const accId=accEl.getAttribute('onclick').match(/'([^']+)'/)[1];
+  const catId=catEl.getAttribute('onclick').match(/'([^']+)'/)[1];
+  const{type,amount,note,date,callback}=grpTxData;
+  const txId=uid();
+  D.transactions.push({id:txId,type,amount,categoryId:catId,accountId:accId,date:date||today(),note,receipts:[],createdAt:Date.now()});
+  saveData();
+  closeOvl('ovl-grptx');
+  if(callback)callback(txId);
+  toast('✅ Transazione registrata');
+}
+
 function openGrpSettle(grpId,from,to,amount){
   grpSettleData={grpId,from,to,amount};
   document.getElementById('grpsettle-info').innerHTML=`<div style="font-size:12px;color:var(--ts);margin-bottom:6px">Pagamento da registrare</div>
@@ -3039,16 +3176,53 @@ function confirmGrpSettle(){
   const accId=accEl.getAttribute('onclick').match(/'([^']+)'/)[1];
   if(!g.settlements)g.settlements=[];
   g.settlements.push({from,to,amount,date:today(),accountId:accId});
-  // Register income
-  const meKey=g.me||g.members[0];
+  const meKey=getMyName();
   if(to===meKey){
+    // Someone paid me — register income automatically
     const cat=D.categories.income.find(c=>c.id==='ci5')||D.categories.income[D.categories.income.length-1];
     D.transactions.push({id:uid(),type:'income',amount,categoryId:cat.id,accountId:accId,date:today(),note:'Saldo da '+from+' ('+g.name+')',createdAt:Date.now(),receipts:[]});
+    saveData();closeOvl('ovl-grpsettle');renderGrpDetail();
+    toast('✅ Pagamento ricevuto registrato');
+  }else if(from===meKey){
+    // I'm paying someone — ask category for expense
+    saveData();closeOvl('ovl-grpsettle');
+    openGrpTxPicker('expense',amount,'Saldo a '+to+' ('+g.name+')',today(),(txId)=>{renderGrpDetail();});
+  }else{
+    saveData();closeOvl('ovl-grpsettle');renderGrpDetail();
+    toast('✅ Pagamento registrato');
   }
-  saveData();closeOvl('ovl-grpsettle');renderGrpDetail();
-  toast('✅ Pagamento registrato');
 }
 
+
+
+// ── PROFILE / ANAGRAFICA ──────────────────────────────────────────────────
+function renderProfileSub(){
+  const b=document.getElementById('sub-profile-body');
+  const p=D.profile||{};
+  b.innerHTML=`<div class="fs">
+    <div style="font-size:13px;color:var(--ts);line-height:1.5">Il tuo nome verrà usato nei gruppi per identificarti automaticamente.</div>
+    <div class="fg"><div class="flbl">Nome</div><input type="text" class="fi" id="profile-fn" placeholder="Mario" value="${p.firstName||''}"></div>
+    <div class="fg"><div class="flbl">Cognome</div><input type="text" class="fi" id="profile-ln" placeholder="Rossi" value="${p.lastName||''}"></div>
+    <div class="fg"><div class="flbl">Telefono (opzionale)</div><input type="tel" class="fi" id="profile-ph" placeholder="+39 ..." value="${p.phone||''}"></div>
+    <button class="btn btn-p" onclick="saveProfile()">Salva</button>
+  </div>`;
+}
+function saveProfile(){
+  const fn=document.getElementById('profile-fn').value.trim();
+  const ln=document.getElementById('profile-ln').value.trim();
+  const ph=document.getElementById('profile-ph').value.trim();
+  if(!fn&&!ln){toast('⚠️ Inserisci almeno il nome');return;}
+  if(!D.profile)D.profile={};
+  D.profile.firstName=fn;
+  D.profile.lastName=ln;
+  D.profile.phone=ph;
+  D.profile.profileBannerDismissed=true;
+  saveData();
+  renderSettings();
+  if(curScr==='dashboard')renderDash();
+  toast('✅ Profilo salvato');
+  goBack();
+}
 
 // ── CONTACTS / RUBRICA SUB ────────────────────────────────────────────────
 let contactEditId=null;
