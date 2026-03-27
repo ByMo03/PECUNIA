@@ -215,6 +215,49 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 .item-sb{font-size:11px;color:var(--tt);margin-top:1px;}
 .item-val{font-size:14px;font-weight:700;}
 @media(max-width:360px){.cat-grid{grid-template-columns:repeat(3,1fr);}}
+/* SCREEN TRANSITIONS */
+.scr{transition:opacity .3s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1);}
+.scr.slide-out-left{transform:translateX(-100%);opacity:0;pointer-events:none;}
+.scr.slide-out-right{transform:translateX(100%);opacity:0;pointer-events:none;}
+.scr.slide-in-left{animation:slideInLeft .3s cubic-bezier(.4,0,.2,1) forwards;}
+.scr.slide-in-right{animation:slideInRight .3s cubic-bezier(.4,0,.2,1) forwards;}
+@keyframes slideInLeft{from{transform:translateX(-100%);opacity:0;}to{transform:translateX(0);opacity:1;}}
+@keyframes slideInRight{from{transform:translateX(100%);opacity:0;}to{transform:translateX(0);opacity:1;}}
+/* TOUR */
+#tour-overlay{position:fixed;inset:0;z-index:2000;pointer-events:none;display:none;}
+#tour-overlay.active{pointer-events:all;display:block;}
+#tour-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.72);}
+#tour-spotlight{position:absolute;border-radius:50%;box-shadow:0 0 0 9999px rgba(0,0,0,.72);pointer-events:none;transition:all .4s cubic-bezier(.4,0,.2,1);}
+#tour-tooltip{position:absolute;background:var(--sf);border:1px solid var(--bd2);border-radius:var(--rl);padding:18px 16px 14px;width:min(300px,calc(100vw - 32px));box-shadow:0 8px 32px rgba(0,0,0,.5);animation:tourFadeIn .25s ease forwards;}
+@keyframes tourFadeIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+#tour-progress{height:3px;background:var(--sf3);border-radius:2px;margin-bottom:12px;overflow:hidden;}
+#tour-progress-fill{height:100%;background:var(--acc);border-radius:2px;transition:width .3s ease;}
+#tour-title{font-size:15px;font-weight:800;margin-bottom:6px;color:var(--tp);}
+#tour-desc{font-size:13px;color:var(--ts);line-height:1.5;margin-bottom:14px;}
+#tour-btns{display:flex;gap:8px;align-items:center;}
+#tour-step-lbl{font-size:11px;color:var(--tt);flex:1;}
+.tour-btn{padding:8px 14px;border-radius:var(--rs);font-family:'Figtree',sans-serif;font-size:13px;font-weight:700;border:none;cursor:pointer;transition:all .15s;}
+.tour-btn-skip{background:transparent;color:var(--tt);}
+.tour-btn-skip:active{color:var(--ts);}
+.tour-btn-prev{background:var(--sf2);color:var(--ts);border:1px solid var(--bd);}
+.tour-btn-next{background:var(--acc);color:#fff;}
+.tour-btn-next:active{opacity:.85;}
+/* ONBOARDING POPUP */
+#ovl-onboarding{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(6px);z-index:1500;display:flex;align-items:center;justify-content:center;}
+.onb-box{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rxl);padding:30px 24px;width:calc(100% - 44px);max-width:320px;text-align:center;}
+.onb-icon{font-size:52px;margin-bottom:12px;}
+.onb-title{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:8px;}
+.onb-desc{font-size:13px;color:var(--ts);line-height:1.6;margin-bottom:24px;}
+.onb-btns{display:flex;flex-direction:column;gap:10px;}
+/* COUNTER ANIMATION */
+@keyframes countUp{from{opacity:.3;}to{opacity:1;}}
+.counting{animation:countUp .1s ease;}
+/* GUIDE SUB */
+.guide-step{padding:14px;border-bottom:1px solid var(--bd);}
+.guide-step:last-child{border-bottom:none;}
+.guide-step-num{font-size:10px;font-weight:800;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;}
+.guide-step-title{font-size:14px;font-weight:700;margin-bottom:3px;}
+.guide-step-desc{font-size:12px;color:var(--ts);line-height:1.5;}
 /* LOCK SCREEN ANIMATIONS */
 #lock{position:fixed;inset:0;background:var(--bg);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;overflow:hidden;}
 .lk-logo,.pin-dots,.pin-err,.pin-kb{position:relative;z-index:1;}
@@ -382,6 +425,34 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 <body>
 
 <div id="ripple-overlay"></div>
+<!-- ONBOARDING POPUP -->
+<div id="ovl-onboarding" style="display:none">
+  <div class="onb-box">
+    <div class="onb-icon">🪙</div>
+    <div class="onb-title">Benvenuto in PECUNIA</div>
+    <div class="onb-desc">Vuoi fare un tour guidato per scoprire tutte le funzionalità dell&#39;app?</div>
+    <div class="onb-btns">
+      <button class="btn btn-p" onclick="startTour()">Inizia il tour</button>
+      <button class="btn btn-s" onclick="skipTour()">Salta per ora</button>
+    </div>
+  </div>
+</div>
+<!-- TOUR OVERLAY -->
+<div id="tour-overlay">
+  <div id="tour-backdrop" onclick=""></div>
+  <div id="tour-spotlight"></div>
+  <div id="tour-tooltip">
+    <div id="tour-progress"><div id="tour-progress-fill"></div></div>
+    <div id="tour-title"></div>
+    <div id="tour-desc"></div>
+    <div id="tour-btns">
+      <span id="tour-step-lbl"></span>
+      <button class="tour-btn tour-btn-skip" onclick="skipTour()">Salta</button>
+      <button class="tour-btn tour-btn-prev" id="tour-prev-btn" onclick="tourPrev()">‹</button>
+      <button class="tour-btn tour-btn-next" id="tour-next-btn" onclick="tourNext()">Avanti</button>
+    </div>
+  </div>
+</div>
 <div id="lock-fadeout"></div>
 <div id="lock">
   <canvas id="lock-canvas" style="position:absolute;inset:0;pointer-events:none;z-index:0;width:100%;height:100%;"></canvas>
@@ -563,6 +634,12 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
           <div class="set-it" onclick="driveStatusClick()"><div class="set-ic" style="background:var(--acc-g)">☁️</div><div class="set-tx"><div class="set-lbl">Backup su Drive</div><div class="set-sub" id="s-drive">Non connesso</div></div><div class="set-arr" id="s-drive-arr">›</div></div>
         </div>
       </div>
+      <div class="set-grp"><div class="set-grp-ttl">Guida</div>
+        <div class="set-list">
+          <div class="set-it" onclick="startTour()"><div class="set-ic" style="background:var(--acc-g)">🎯</div><div class="set-tx"><div class="set-lbl">Inizia tour guidato</div><div class="set-sub">Scopri tutte le funzioni</div></div><div class="set-arr">&#8250;</div></div>
+          <div class="set-it" onclick="navigate('sub-guide')"><div class="set-ic" style="background:var(--inc-g)">📖</div><div class="set-tx"><div class="set-lbl">Mini manuale</div><div class="set-sub">Consulta la guida completa</div></div><div class="set-arr">&#8250;</div></div>
+        </div>
+      </div>
       <div style="padding:24px 14px;text-align:center;color:var(--tt);font-size:11px;">PECUNIA v2.0 · Dati salvati localmente + Google Drive</div>
     </div>
 
@@ -590,6 +667,8 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
       <div class="sub-body" id="sub-grpdetail-body"></div>
     </div>
 
+    <!-- SUB: GUIDE -->
+    <div class="sub" id="sub-guide"><div class="sub-hdr"><div class="sub-hdr-back" onclick="goBack()">&#8249;</div><div class="sub-hdr-title">Guida</div><div class="sub-hdr-act" onclick="startTour()" style="font-size:14px;font-weight:700;color:var(--acc)">Tour</div></div><div class="sub-body" id="sub-guide-body"></div></div>
     <!-- SUB: PIN -->
     <div class="sub" id="sub-pin"><div class="sub-hdr"><div class="sub-hdr-back" onclick="goBack()">‹</div><div class="sub-hdr-title">Sicurezza PIN</div></div><div class="sub-body" id="sub-pin-body"></div></div>
   </div>
@@ -954,7 +1033,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 const SK='finanza_v1';
 const CLIENT_ID='472780980276-j7tadqv8v4f33thsnpkfhlggmrssmoee.apps.googleusercontent.com';
 const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
-const SCHEMA_VERSION=4;
+const SCHEMA_VERSION=5;
 const DRIVE_FILENAME='finanza_backup.json';
 const DEF_EXP_CATS=[
   {id:'ce1',name:'Cibo',emoji:'🍔',custom:false},{id:'ce2',name:'Ristorante',emoji:'🍽️',custom:false},
@@ -1006,20 +1085,18 @@ function migrateData(d){
     if(d.contacts)d.contacts.forEach(c=>{if(!c.phone)c.phone='';if(!c.notes)c.notes='';});
   }
   if((d.schemaVersion||1) < 4){
-    // Add profile
     if(!d.profile)d.profile={firstName:'',lastName:'',phone:'',profileBannerDismissed:false};
-    // Fix group member keys — ensure g.me is set
     if(d.groups)d.groups.forEach(g=>{if(!g.me)g.me=g.members[0]||'';});
-    // Remove double-counted exp.settlements (unify to g.settlements only)
     if(d.groups)d.groups.forEach(g=>{
       if(!g.settlements)g.settlements=[];
       if(g.expenses)g.expenses.forEach(e=>{
-        if(e.settlements&&e.settlements.length){
-          g.settlements.push(...e.settlements);
-          e.settlements=[];
-        }
+        if(e.settlements&&e.settlements.length){g.settlements.push(...e.settlements);e.settlements=[];}
       });
     });
+  }
+  if((d.schemaVersion||1) < 5){
+    // Add tour state
+    if(!d.tour)d.tour={completed:false,skipped:false};
   }
   d.schemaVersion=SCHEMA_VERSION;
   return d;
@@ -1035,7 +1112,8 @@ function initData(){
     ],
     categories:{expense:[...DEF_EXP_CATS],income:[...DEF_INC_CATS]},
     transactions:[],recurring:[],contacts:[],debts:[],groups:[],
-    profile:{firstName:'',lastName:'',phone:'',profileBannerDismissed:false}
+    profile:{firstName:'',lastName:'',phone:'',profileBannerDismissed:false},
+    tour:{completed:false,skipped:false}
   };
   saveData();
 }
@@ -1285,13 +1363,33 @@ function unlock(){
   }else{
     window.addEventListener('load',()=>setTimeout(driveInit,500));
   }
+  setTimeout(showOnboarding,600);
 }
 
 // ── NAVIGATION ─────────────────────────────────────────────────────────────
 let curScr='dashboard',curSub=null;
+const SCR_ORDER=['dashboard','transactions','stats','groups','settings'];
 function showScr(name){
-  document.querySelectorAll('.scr').forEach(s=>s.classList.remove('act'));
-  document.getElementById('scr-'+name).classList.add('act');
+  const prev=curScr;
+  const prevIdx=SCR_ORDER.indexOf(prev);
+  const nextIdx=SCR_ORDER.indexOf(name);
+  const goRight=nextIdx>prevIdx;
+  // Slide out current
+  const prevEl=document.getElementById('scr-'+prev);
+  if(prevEl&&prev!==name){
+    prevEl.classList.remove('act');
+    prevEl.classList.add(goRight?'slide-out-left':'slide-out-right');
+    setTimeout(()=>prevEl.classList.remove('slide-out-left','slide-out-right'),320);
+  }
+  document.querySelectorAll('.scr').forEach(s=>{if(s.id!=='scr-'+name&&s.id!=='scr-'+prev)s.classList.remove('act');});
+  const nextEl=document.getElementById('scr-'+name);
+  if(nextEl){
+    nextEl.classList.add('act');
+    if(prev!==name){
+      nextEl.classList.add(goRight?'slide-in-right':'slide-in-left');
+      setTimeout(()=>nextEl.classList.remove('slide-in-left','slide-in-right'),320);
+    }
+  }
   curScr=name;
   document.querySelectorAll('.sub').forEach(s=>s.classList.remove('open'));curSub=null;
   document.querySelectorAll('.ni').forEach(n=>n.classList.remove('act'));
@@ -1318,6 +1416,7 @@ function navigate(sub){
   if(sub==='sub-pin')renderPinSub();
   if(sub==='sub-contacts')renderContactsSub();
   if(sub==='sub-profile')renderProfileSub();
+  if(sub==='sub-guide')renderGuideSub();
   if(sub==='sub-grpdetail'){
     const g=D.groups.find(x=>x.id===grpDetailId);
     if(g)document.getElementById('sub-grpdetail-title').textContent=g.name;
@@ -1559,11 +1658,11 @@ function renderStats(){
   document.getElementById('st-prd-lbl').textContent=getPrdLbl({start,end});
   const{inc,exp}=prdTotalsFiltered(start,end,stAccFilter);
   const net=inc-exp;
-  document.getElementById('st-inc').textContent=fmt(inc);
-  document.getElementById('st-exp').textContent=fmt(exp);
+  animateCounter('st-inc',inc,false);
+  animateCounter('st-exp',exp,false);
   const netEl=document.getElementById('st-net');
-  netEl.textContent=fmt(Math.abs(net));
   netEl.style.color=net>=0?'var(--inc)':net<0?'var(--exp)':'';
+  animateCounter('st-net',Math.abs(net),false);
   renderPie(start,end,stAccFilter);renderBar(start,end,stAccFilter);renderLine(start,end,stAccFilter);
   renderComparison(start,end,stAccFilter);renderTopCats(start,end,stAccFilter);
 }
@@ -1577,7 +1676,7 @@ function renderPie(start,end,accId){
   if(chPie){chPie.destroy();chPie=null;}
   const ctx=document.getElementById('ch-pie').getContext('2d');
   if(!vals.length){ctx.clearRect(0,0,300,200);document.getElementById('pie-leg').innerHTML='<div style="text-align:center;color:var(--tt);font-size:12px;padding:10px">Nessuna spesa</div>';return;}
-  chPie=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:colors,borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>' '+fmt(i.raw)+' ('+((i.raw/total)*100).toFixed(1)+'%)'}}},cutout:'65%'}});
+  chPie=new Chart(ctx,{type:'doughnut',animation:{animateRotate:true,duration:700,easing:'easeOutQuart'},data:{labels,datasets:[{data:vals,backgroundColor:colors,borderWidth:0,hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:i=>' '+fmt(i.raw)+' ('+((i.raw/total)*100).toFixed(1)+'%)'}}},cutout:'65%'}});
   document.getElementById('pie-leg').innerHTML=entries.map(([id,v],i)=>{
     const cat=getCat(id,'expense');
     return`<div class="leg-it"><div class="leg-left"><div class="leg-dot" style="background:${colors[i]}"></div><div class="leg-lbl">${cat.emoji} ${cat.name}</div></div><span class="leg-pct">${((v/total)*100).toFixed(1)}%</span><span class="leg-val">${fmt(v)}</span></div>`;
@@ -1596,7 +1695,7 @@ function renderBar(start,end){
     for(let m=0;m<12;m++){const ms=new Date(start.getFullYear(),m,1),me=new Date(start.getFullYear(),m+1,0);labels.push(ms.toLocaleDateString('it-IT',{month:'short'}));const r=prdTotalsFiltered(ms,me,accId);incData.push(r.inc);expData.push(r.exp);}
   }
   const ctx=document.getElementById('ch-bar').getContext('2d');
-  chBar=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Entrate',data:incData,backgroundColor:'rgba(48,209,88,.5)',borderColor:'#30d158',borderWidth:1.5,borderRadius:4},{label:'Uscite',data:expData,backgroundColor:'rgba(255,69,58,.5)',borderColor:'#ff453a',borderWidth:1.5,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#98989d',font:{size:11,family:'Figtree'},boxWidth:10}}},scales:{x:{ticks:{color:'#636366',font:{size:10,family:'Figtree'}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#636366',font:{size:10,family:'Figtree'},callback:v=>getSym()+fmtN(v)},grid:{color:'rgba(255,255,255,.07)'}}}}});
+  chBar=new Chart(ctx,{type:'bar',animation:{duration:600,easing:'easeOutQuart'},data:{labels,datasets:[{label:'Entrate',data:incData,backgroundColor:'rgba(48,209,88,.5)',borderColor:'#30d158',borderWidth:1.5,borderRadius:4},{label:'Uscite',data:expData,backgroundColor:'rgba(255,69,58,.5)',borderColor:'#ff453a',borderWidth:1.5,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#98989d',font:{size:11,family:'Figtree'},boxWidth:10}}},scales:{x:{ticks:{color:'#636366',font:{size:10,family:'Figtree'}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#636366',font:{size:10,family:'Figtree'},callback:v=>getSym()+fmtN(v)},grid:{color:'rgba(255,255,255,.07)'}}}}});
 }
 function renderLine(start,end,accId){
   if(chLine){chLine.destroy();chLine=null;}
@@ -1626,7 +1725,7 @@ function renderLine(start,end,accId){
   }
   const ctx=document.getElementById('ch-line').getContext('2d');
   const grad=ctx.createLinearGradient(0,0,0,190);grad.addColorStop(0,'rgba(79,142,247,.3)');grad.addColorStop(1,'rgba(79,142,247,0)');
-  chLine=new Chart(ctx,{type:'line',data:{labels,datasets:[{label:'Saldo',data:balData,borderColor:'#4f8ef7',backgroundColor:grad,borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#636366',font:{size:10,family:'Figtree'},maxRotation:0},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#636366',font:{size:10,family:'Figtree'},callback:v=>getSym()+fmtN(v)},grid:{color:'rgba(255,255,255,.07)'}}}}});
+  chLine=new Chart(ctx,{type:'line',animation:{duration:700,easing:'easeOutQuart'},data:{labels,datasets:[{label:'Saldo',data:balData,borderColor:'#4f8ef7',backgroundColor:grad,borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#636366',font:{size:10,family:'Figtree'},maxRotation:0},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#636366',font:{size:10,family:'Figtree'},callback:v=>getSym()+fmtN(v)},grid:{color:'rgba(255,255,255,.07)'}}}}});
 }
 
 // ── ACCOUNTS SUB ───────────────────────────────────────────────────────────
@@ -2602,14 +2701,14 @@ function renderComparison(start,end,accId){
   const curLbl=getPrdLbl({start,end});const prvLbl=getPrdLbl(prev);
   const ctx=document.getElementById('ch-cmp').getContext('2d');
   if(cmpType==='bar'){
-    chCmp=new Chart(ctx,{type:'bar',data:{labels,datasets:[
+    chCmp=new Chart(ctx,{type:'bar',animation:{duration:600,easing:'easeOutQuart'},data:{labels,datasets:[
       {label:curLbl+' Uscite',data:curExp,backgroundColor:'rgba(255,69,58,.6)',borderColor:'#ff453a',borderWidth:1.5,borderRadius:3},
       {label:prvLbl+' Uscite',data:prvExp,backgroundColor:'rgba(255,69,58,.25)',borderColor:'rgba(255,69,58,.5)',borderWidth:1,borderRadius:3},
       {label:curLbl+' Entrate',data:curInc,backgroundColor:'rgba(48,209,88,.6)',borderColor:'#30d158',borderWidth:1.5,borderRadius:3},
       {label:prvLbl+' Entrate',data:prvInc,backgroundColor:'rgba(48,209,88,.25)',borderColor:'rgba(48,209,88,.5)',borderWidth:1,borderRadius:3},
     ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#636366',font:{size:10,family:'Figtree'}},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#636366',font:{size:10,family:'Figtree'},callback:v=>getSym()+fmtN(v)},grid:{color:'rgba(255,255,255,.07)'}}}}});
   }else{
-    chCmp=new Chart(ctx,{type:'line',data:{labels,datasets:[
+    chCmp=new Chart(ctx,{type:'line',animation:{duration:700,easing:'easeOutQuart'},data:{labels,datasets:[
       {label:curLbl+' Uscite',data:curExp,borderColor:'#ff453a',backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.4},
       {label:prvLbl+' Uscite',data:prvExp,borderColor:'rgba(255,69,58,.4)',backgroundColor:'transparent',borderWidth:1.5,pointRadius:1,borderDash:[4,3],tension:.4},
       {label:curLbl+' Entrate',data:curInc,borderColor:'#30d158',backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.4},
@@ -3377,6 +3476,145 @@ function processImportCSV(input){
     }
   };
   reader.readAsText(file,'UTF-8');
+}
+
+
+// ── TOUR STEPS ─────────────────────────────────────────────────────────────
+// To update: add/remove/edit steps in this array only
+const TOUR_STEPS=[
+  {id:'dashboard',title:'Dashboard',
+   desc:'La schermata principale mostra il patrimonio netto, entrate e uscite del mese e il budget.',
+   selector:'#scr-dashboard .bal-card',screen:'dashboard'},
+  {id:'accounts',title:'Conti',
+   desc:'Vedi tutti i tuoi conti con il saldo aggiornato. Tocca il chip + per aggiungerne uno nuovo.',
+   selector:'#d-accs',screen:'dashboard'},
+  {id:'fab',title:'Aggiungi transazione',
+   desc:'Il pulsante + in basso a destra apre il menu per aggiungere spese, entrate o trasferimenti.',
+   selector:'#fab',screen:'dashboard'},
+  {id:'transactions',title:'Movimenti',
+   desc:'Tutte le transazioni. Filtra per tipo, cerca con la lente, naviga tra i mesi con le frecce.',
+   selector:'#scr-transactions .fchips',screen:'transactions'},
+  {id:'stats',title:'Statistiche',
+   desc:'Grafici per settimana, mese o anno. Seleziona un conto specifico dal menu a tendina.',
+   selector:'.prd-sel',screen:'stats'},
+  {id:'charts',title:'Grafici disponibili',
+   desc:'Spese per categoria, entrate vs uscite, andamento saldo e confronto con il periodo precedente.',
+   selector:'#ch-pie',screen:'stats'},
+  {id:'groups',title:'Gruppi e Debiti',
+   desc:'Tieni traccia di chi deve cosa a chi. Crea gruppi per dividere spese, registra debiti semplici.',
+   selector:'.fchip[data-gt="groups"]',screen:'groups'},
+  {id:'calculator',title:'Calcolatrice',
+   desc:'Il tasto accanto al campo importo apre una calcolatrice. Calcola ad esempio 10x4 e il risultato va nel campo.',
+   selector:'#fab',screen:'dashboard'},
+  {id:'settings',title:'Impostazioni',
+   desc:'Gestisci conti, categorie, rubrica, budget, valuta, PIN e backup su Google Drive.',
+   selector:'#ni-settings',screen:'settings'},
+  {id:'drive',title:'Google Drive',
+   desc:"Connetti Google Drive per salvare automaticamente tutti i dati. L'icona in alto mostra lo stato sync.",
+   selector:'#drive-status',screen:'settings'},
+];
+
+// ── TOUR STATE ──────────────────────────────────────────────────────────────
+let tourStep=0,tourActive=false;
+
+function showOnboarding(){
+  if(!D.tour||(!D.tour.completed&&!D.tour.skipped)){
+    document.getElementById('ovl-onboarding').style.display='flex';
+  }
+}
+function startTour(){
+  document.getElementById('ovl-onboarding').style.display='none';
+  tourStep=0;tourActive=true;
+  document.getElementById('tour-overlay').classList.add('active');
+  showTourStep();
+}
+function skipTour(){
+  document.getElementById('ovl-onboarding').style.display='none';
+  document.getElementById('tour-overlay').classList.remove('active');
+  tourActive=false;
+  if(!D.tour)D.tour={};
+  D.tour.skipped=true;
+  saveData();
+}
+function tourNext(){
+  if(tourStep<TOUR_STEPS.length-1){tourStep++;showTourStep();}
+  else finishTour();
+}
+function tourPrev(){
+  if(tourStep>0){tourStep--;showTourStep();}
+}
+function finishTour(){
+  document.getElementById('tour-overlay').classList.remove('active');
+  tourActive=false;
+  if(!D.tour)D.tour={};
+  D.tour.completed=true;D.tour.skipped=false;
+  saveData();
+  toast('Tour completato! Ritrovi la guida nelle Impostazioni.');
+}
+function showTourStep(){
+  const step=TOUR_STEPS[tourStep];if(!step)return;
+  if(step.screen&&step.screen!==curScr)showScr(step.screen);
+  const pct=((tourStep+1)/TOUR_STEPS.length*100).toFixed(0);
+  document.getElementById('tour-progress-fill').style.width=pct+'%';
+  document.getElementById('tour-step-lbl').textContent=(tourStep+1)+' di '+TOUR_STEPS.length;
+  document.getElementById('tour-title').textContent=step.title;
+  document.getElementById('tour-desc').textContent=step.desc;
+  document.getElementById('tour-prev-btn').style.opacity=tourStep===0?'0.3':'1';
+  document.getElementById('tour-prev-btn').disabled=tourStep===0;
+  document.getElementById('tour-next-btn').textContent=tourStep===TOUR_STEPS.length-1?'Fine':'Avanti';
+  setTimeout(()=>positionTourSpotlight(step),350);
+}
+function positionTourSpotlight(step){
+  const el=document.querySelector(step.selector);
+  const spl=document.getElementById('tour-spotlight');
+  const tip=document.getElementById('tour-tooltip');
+  if(!el){spl.style.display='none';positionTooltipCenter(tip);return;}
+  spl.style.display='block';
+  const r=el.getBoundingClientRect();
+  const pad=20;
+  const cx=r.left+r.width/2;
+  const cy=r.top+r.height/2;
+  const radius=Math.max(r.width,r.height)/2+pad;
+  const size=radius*2;
+  spl.style.width=size+'px';spl.style.height=size+'px';
+  spl.style.left=(cx-radius)+'px';spl.style.top=(cy-radius)+'px';
+  spl.style.boxShadow='0 0 0 9999px rgba(0,0,0,.75),0 0 '+pad+'px '+(pad/2)+'px rgba(0,0,0,.25)';
+  const tipH=150;
+  const tipW=Math.min(300,window.innerWidth-32);
+  const spaceBelow=window.innerHeight-(cy+radius+16);
+  const spaceAbove=cy-radius-16;
+  let tipTop=spaceBelow>=tipH||spaceBelow>=spaceAbove?cy+radius+14:cy-radius-tipH-14;
+  let tipLeft=Math.max(16,Math.min(cx-tipW/2,window.innerWidth-tipW-16));
+  tipTop=Math.max(16,Math.min(tipTop,window.innerHeight-tipH-16));
+  tip.style.cssText=`left:${tipLeft}px;top:${tipTop}px;width:${tipW}px;animation:none;`;
+  void tip.offsetWidth;
+  tip.style.animation='tourFadeIn .25s ease forwards';
+}
+function positionTooltipCenter(tip){
+  const tipW=Math.min(300,window.innerWidth-32);
+  tip.style.cssText=`left:${(window.innerWidth-tipW)/2}px;top:${(window.innerHeight-180)/2}px;width:${tipW}px;`;
+}
+function renderGuideSub(){
+  const b=document.getElementById('sub-guide-body');
+  b.innerHTML='<div class="set-list" style="margin:14px">'+
+    TOUR_STEPS.map((s,i)=>`<div class="guide-step">
+      <div class="guide-step-num">Step ${i+1} di ${TOUR_STEPS.length}</div>
+      <div class="guide-step-title">${s.title}</div>
+      <div class="guide-step-desc">${s.desc}</div>
+    </div>`).join('')+
+  '</div>';
+}
+function animateCounter(elId,targetVal){
+  const el=document.getElementById(elId);if(!el)return;
+  const dur=500;const start=Date.now();
+  function tick(){
+    const p=Math.min((Date.now()-start)/dur,1);
+    const e=1-Math.pow(1-p,3);
+    el.textContent=fmt(targetVal*e);
+    if(p<1)requestAnimationFrame(tick);
+    else el.textContent=fmt(targetVal);
+  }
+  requestAnimationFrame(tick);
 }
 
 // ── OVERLAY HELPERS ────────────────────────────────────────────────────────
