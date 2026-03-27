@@ -2089,41 +2089,82 @@ function calcEquals(){
 }
 
 // ── GOOGLE DRIVE ───────────────────────────────────────────────────────────
-let driveConnected=false,driveFileId=null,driveTokenClient=null,driveSyncTimer=null;
+let driveConnected=false,driveFileId=null,driveTokenClient=null,driveSyncTimer=null,driveTokenExpiry=0,driveRefreshTimer=null;
 const DRIVE_FILE_ID_KEY='finanza_drive_file_id';
+const DRIVE_TOKEN_EXPIRY_KEY='finanza_drive_token_expiry';
 
 function driveInit(){
-  // Load stored file ID
   driveFileId=localStorage.getItem(DRIVE_FILE_ID_KEY)||null;
-  // Init GAPI
   gapi.load('client',async()=>{
     await gapi.client.init({});
     await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-    // Init token client
+    // Init token client — used for both first login and silent refresh
     driveTokenClient=google.accounts.oauth2.initTokenClient({
       client_id:CLIENT_ID,
       scope:DRIVE_SCOPE,
       callback:(resp)=>{
-        if(resp.error){driveSetStatus('error');toast('❌ Errore connessione Drive: '+resp.error);return;}
+        if(resp.error){
+          // Silent refresh failed — try explicit login only if user initiated
+          if(resp.error==='interaction_required'||resp.error==='login_required'){
+            driveConnected=false;driveSetStatus('disconnected');renderSettings();
+          }else{
+            driveSetStatus('error');
+          }
+          return;
+        }
+        // Token received — store with expiry (Google tokens last 3600s, refresh at 3000s)
         driveConnected=true;
+        const expiry=Date.now()+(resp.expires_in||3600)*1000;
+        driveTokenExpiry=expiry;
+        localStorage.setItem('finanza_drive_token',resp.access_token);
+        localStorage.setItem(DRIVE_TOKEN_EXPIRY_KEY,String(expiry));
+        gapi.client.setToken({access_token:resp.access_token});
         driveSetStatus('connected');
         renderSettings();
-        driveFirstSync();
+        // Schedule next silent refresh at 50 min (3000s)
+        scheduleTokenRefresh(3000);
       }
     });
-    // Check if we have a stored session
+    // Check stored token
     const storedToken=localStorage.getItem('finanza_drive_token');
+    const storedExpiry=parseInt(localStorage.getItem(DRIVE_TOKEN_EXPIRY_KEY)||'0');
     if(storedToken){
-      try{
+      const now=Date.now();
+      const remaining=storedExpiry-now;
+      if(remaining>60000){
+        // Token still valid — use it directly
         gapi.client.setToken({access_token:storedToken});
-        // Verify token still valid
-        driveConnected=true;
-        driveSetStatus('connected');
-        renderSettings();
+        driveConnected=true;driveTokenExpiry=storedExpiry;
+        driveSetStatus('connected');renderSettings();
         driveSyncNow();
-      }catch(e){localStorage.removeItem('finanza_drive_token');driveSetStatus('disconnected');}
+        // Schedule refresh based on remaining time (or at 50min mark)
+        const refreshIn=Math.max(0,Math.min(remaining-300000,3000000));
+        scheduleTokenRefresh(refreshIn/1000);
+      }else{
+        // Token expired or about to — try silent refresh
+        driveSetStatus('syncing');
+        driveSilentRefresh();
+      }
     }
   });
+}
+
+function scheduleTokenRefresh(inSeconds){
+  clearTimeout(driveRefreshTimer);
+  driveRefreshTimer=setTimeout(()=>{
+    if(driveConnected)driveSilentRefresh();
+  },inSeconds*1000);
+}
+
+function driveSilentRefresh(){
+  if(!driveTokenClient)return;
+  try{
+    // prompt:'' means no UI — fails silently if session expired
+    driveTokenClient.requestAccessToken({prompt:''});
+  }catch(e){
+    console.warn('Silent refresh failed:',e);
+    driveConnected=false;driveSetStatus('disconnected');renderSettings();
+  }
 }
 
 function driveStatusClick(){
@@ -2145,7 +2186,9 @@ function driveDisconnect(){
   google.accounts.oauth2.revoke(gapi.client.getToken()?.access_token||'',()=>{});
   gapi.client.setToken(null);
   driveConnected=false;driveFileId=null;
+  clearTimeout(driveRefreshTimer);
   localStorage.removeItem('finanza_drive_token');
+  localStorage.removeItem(DRIVE_TOKEN_EXPIRY_KEY);
   localStorage.removeItem(DRIVE_FILE_ID_KEY);
   driveSetStatus('disconnected');
   renderSettings();
@@ -2205,8 +2248,15 @@ async function driveSyncNow(){
     driveSetStatus('connected');
     toast('☁️ Salvato su Drive');
   }catch(e){
-    driveSetStatus('error');
-    toast('❌ Errore sincronizzazione Drive');
+    // Check if it's an auth error (401) — try silent refresh
+    if(e&&(e.status===401||String(e).includes('401')||String(e).includes('invalid_token'))){
+      driveConnected=false;driveSetStatus('disconnected');
+      toast('🔄 Sessione Drive scaduta — riconnessione in corso...');
+      setTimeout(()=>{if(driveTokenClient)driveSilentRefresh();},800);
+    }else{
+      driveSetStatus('error');
+      toast('❌ Errore sincronizzazione Drive');
+    }
     console.error('Drive sync error:',e);
   }
 }
