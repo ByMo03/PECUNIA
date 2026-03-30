@@ -215,6 +215,20 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 .item-sb{font-size:11px;color:var(--tt);margin-top:1px;}
 .item-val{font-size:14px;font-weight:700;}
 @media(max-width:360px){.cat-grid{grid-template-columns:repeat(3,1fr);}}
+.day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px;}
+.day-cell{height:36px;border-radius:var(--rs);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;cursor:pointer;background:var(--sf2);color:var(--ts);border:1.5px solid transparent;transition:all .15s;}
+.day-cell:active{transform:scale(.92);}
+.day-cell.sel{background:var(--acc);color:#fff;border-color:var(--acc);}
+/* FUTURE RECURRING */
+.txi-future{border:1.5px dashed var(--bd2);border-radius:var(--rs);opacity:.75;}
+.txi-future .txi-amt{opacity:.7;}
+/* RECEIPT BADGE */
+.txi-badge{font-size:10px;color:var(--ts);margin-left:3px;opacity:.7;}
+/* RECEIPT UPLOAD SPINNER */
+.rcpt-uploading{position:relative;opacity:.7;}
+.rcpt-spin{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.4);border-radius:10px;font-size:16px;}
+@keyframes rcptSpin{to{transform:rotate(360deg)}}
+.rcpt-spin-icon{display:inline-block;animation:rcptSpin .7s linear infinite;}
 /* SCREEN TRANSITIONS */
 .scr{transition:opacity .3s cubic-bezier(.4,0,.2,1),transform .3s cubic-bezier(.4,0,.2,1);}
 .scr.slide-out-left{transform:translateX(-100%);opacity:0;pointer-events:none;}
@@ -427,7 +441,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 <div id="ripple-overlay"></div>
 <!-- ONBOARDING POPUP -->
 <div id="ovl-onboarding" style="display:none">
-  <div class="onb-box">
+  <div class="onb-box" id="onb-tour-box">
     <div class="onb-icon">🪙</div>
     <div class="onb-title">Benvenuto in PECUNIA</div>
     <div class="onb-desc">Vuoi fare un tour guidato per scoprire tutte le funzionalità dell&#39;app?</div>
@@ -437,6 +451,15 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
     </div>
   </div>
 </div>
+  <div class="onb-box" id="onb-pin-box" style="display:none">
+    <div class="onb-icon">🔐</div>
+    <div class="onb-title">Protezione PIN</div>
+    <div class="onb-desc">Vuoi proteggere PECUNIA con un PIN? Potrai cambiarlo o disattivarlo dalle impostazioni.</div>
+    <div class="onb-btns">
+      <button class="btn btn-p" onclick="onbEnablePin()">Imposta PIN</button>
+      <button class="btn btn-s" onclick="onbSkipPin()">Non ora</button>
+    </div>
+  </div>
 <!-- TOUR OVERLAY -->
 <div id="tour-overlay">
   <div id="tour-backdrop" onclick=""></div>
@@ -536,6 +559,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
         <div class="fchip" data-f="expense" onclick="setTxF('expense')">Uscite</div>
         <div class="fchip" data-f="income" onclick="setTxF('income')">Entrate</div>
         <div class="fchip" data-f="transfer" onclick="setTxF('transfer')">⇄ Trasferimenti</div>
+        <div class="fchip" id="fchip-future" onclick="togFutureRec()">🔄 Previste</div>
       </div>
       <div class="prd-nav">
         <div class="prd-arr" onclick="txPrev()">‹</div>
@@ -553,6 +577,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
         <div class="prd-btn" data-p="year" onclick="setStPrd('year')">Anno</div>
       </div>
       <div style="padding:8px 14px 0"><select class="fi" id="st-acc-sel" onchange="setStAcc(this.value)"><option value="">Tutti i conti</option></select></div>
+      <div style="padding:4px 14px 0;display:flex;gap:8px;"><div class="fchip" id="st-chip-rec" onclick="togStRec()">🔄 Ricorrenti</div></div>
       <div class="prd-nav"><div class="prd-arr" onclick="stPrev()">‹</div><div class="prd-lbl" id="st-prd-lbl"></div><div class="prd-arr" onclick="stNext()">›</div></div>
       <div class="st-grid">
         <div class="st-card"><div class="st-lbl">Entrate</div><div class="st-val income" id="st-inc">€0,00</div></div>
@@ -804,12 +829,14 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
     <div class="sh-hdr"><div class="sh-ttl" id="sh-rec-ttl">Nuova ricorrente</div><div class="sh-cls" onclick="closeOvl('ovl-rec')">✕</div></div>
     <div class="fs">
       <div class="ty-tog"><div class="ty-btn act expense" id="rt-exp" onclick="setRecT('expense')">↓ Spesa</div><div class="ty-btn income" id="rt-inc" onclick="setRecT('income')">↑ Entrata</div></div>
+      <div class="fg"><div class="flbl">Titolo</div><input type="text" class="fi" id="rec-title" placeholder="Es. Affitto, Netflix..."></div>
       <div class="fg"><div class="flbl">Importo</div><div class="ai-wrap"><span class="ai-sym" id="rec-sym">€</span><input type="number" class="fi ai" id="rec-amt" placeholder="0,00" step="0.01" inputmode="decimal"><span class="calc-btn" onclick="openCalc('rec-amt')">🧮</span></div></div>
       <div class="fg"><div class="flbl">Categoria</div><div class="cat-grid" id="rec-cats"></div></div>
       <div class="fg"><div class="flbl">Conto</div><div class="acc-sel" id="rec-accs"></div></div>
       <div class="fg"><div class="flbl">Data di inizio</div><input type="date" class="fi" id="rec-date"></div>
-      <div class="fg"><div class="flbl">Frequenza</div><select class="fi" id="rec-freq"><option value="daily">Ogni giorno</option><option value="weekly">Ogni settimana</option><option value="monthly" selected>Ogni mese</option><option value="yearly">Ogni anno</option></select></div>
-      <div class="fg"><div class="flbl">Note</div><input type="text" class="fi" id="rec-note" placeholder="Descrizione..."></div>
+      <div class="fg"><div class="flbl">Frequenza</div><select class="fi" id="rec-freq" onchange="updateRecDayPicker()"><option value="daily">Ogni giorno</option><option value="weekly">Ogni settimana</option><option value="monthly" selected>Ogni mese</option><option value="yearly">Ogni anno</option></select></div>
+      <div class="fg" id="rec-day-sec" style="display:none"><div class="flbl">Giorno del mese (opzionale)</div><div class="day-grid" id="rec-day-grid"></div></div>
+      <div class="fg"><div class="flbl">Note</div><input type="text" class="fi" id="rec-note" placeholder="Note aggiuntive..."></div>
       <button class="btn btn-p" onclick="saveRec()">Salva</button>
       <button class="btn btn-d" id="rec-del-btn" style="display:none" onclick="delRec()">Elimina ricorrente</button>
     </div>
@@ -1033,7 +1060,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 const SK='finanza_v1';
 const CLIENT_ID='472780980276-j7tadqv8v4f33thsnpkfhlggmrssmoee.apps.googleusercontent.com';
 const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
-const SCHEMA_VERSION=5;
+const SCHEMA_VERSION=8;
 const DRIVE_FILENAME='finanza_backup.json';
 const DEF_EXP_CATS=[
   {id:'ce1',name:'Cibo',emoji:'🍔',custom:false},{id:'ce2',name:'Ristorante',emoji:'🍽️',custom:false},
@@ -1095,8 +1122,27 @@ function migrateData(d){
     });
   }
   if((d.schemaVersion||1) < 5){
-    // Add tour state
     if(!d.tour)d.tour={completed:false,skipped:false};
+  }
+  if((d.schemaVersion||1) < 6){
+    if(d.transactions)d.transactions.forEach(tx=>{
+      if(tx.receipts)tx.receipts.forEach(r=>{
+        if(r.dataUrl&&!r.pendingMigration)r.pendingMigration=true;
+      });
+    });
+    d.receiptsMigrated=false;
+  }
+  if((d.schemaVersion||1) < 7){
+    if(d.settings&&d.settings.showFutureRec===undefined)d.settings.showFutureRec=false;
+    if(d.debts)d.debts.forEach(debt=>{if(debt.linkedTxId===undefined)debt.linkedTxId=null;});
+  }
+  if((d.schemaVersion||1) < 8){
+    if(d.recurring)d.recurring.forEach(r=>{if(!r.title)r.title='';});
+    if(d.settings){
+      if(d.settings.showRecInStats===undefined)d.settings.showRecInStats=false;
+      // Set pinEnabled based on whether user has a PIN — critical for lock screen
+      if(d.settings.pinEnabled===undefined)d.settings.pinEnabled=!!(d.settings.pin);
+    }
   }
   d.schemaVersion=SCHEMA_VERSION;
   return d;
@@ -1105,7 +1151,7 @@ function initData(){
   const ex=loadData();
   if(ex){D=migrateData(ex);return;}
   D={version:1,schemaVersion:SCHEMA_VERSION,
-    settings:{pin:'1234',currency:'EUR',budgetMonthly:null,budgetEnabled:false},
+    settings:{pin:'1234',currency:'EUR',budgetMonthly:null,budgetEnabled:false,showFutureRec:false,showRecInStats:false,pinEnabled:true},
     accounts:[
       {id:uid(),name:'Contanti',emoji:'💰',color:'#30d158',initialBalance:0},
       {id:uid(),name:'Bancomat',emoji:'💳',color:'#4f8ef7',initialBalance:0}
@@ -1149,6 +1195,10 @@ function totalBal(){return D.accounts.reduce((s,a)=>s+accBal(a.id),0);}
 function moTotals(){
   const{start,end}=getMo(0);let inc=0,exp=0;
   D.transactions.forEach(t=>{if(inRng(t.date,start,end)&&t.type!=='transfer-out'&&t.type!=='transfer-in'){t.type==='income'?inc+=Number(t.amount):exp+=Number(t.amount);}});
+  // Include future recurring if toggle is on
+  if(D.settings&&D.settings.showFutureRec){
+    getFutureRec(start,end).forEach(f=>{f.type==='income'?inc+=Number(f.amount):exp+=Number(f.amount);});
+  }
   return{inc,exp};
 }
 function prdTotals(s,e){
@@ -1196,6 +1246,19 @@ window.addEventListener('DOMContentLoaded',()=>{
   initLock();
 });
 
+function nextDateRec(ds,freq,dayOfMonth){
+  const d=new Date(ds+'T00:00:00');
+  if(freq==='daily'){d.setDate(d.getDate()+1);}
+  else if(freq==='weekly'){d.setDate(d.getDate()+7);}
+  else if(freq==='monthly'){
+    d.setMonth(d.getMonth()+1);
+    if(dayOfMonth){const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(dayOfMonth,last));}
+  }else if(freq==='yearly'){
+    d.setFullYear(d.getFullYear()+1);
+    if(dayOfMonth){const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(dayOfMonth,last));}
+  }
+  return d.toISOString().split('T')[0];
+}
 function processRec(){
   if(!D.recurring||!D.recurring.length)return;
   const td=today();let changed=false;
@@ -1203,8 +1266,10 @@ function processRec(){
     if(!r.active)return;
     let next=r.nextDate||r.startDate;
     while(next<=td){
-      D.transactions.push({id:uid(),type:r.type,amount:r.amount,categoryId:r.categoryId,accountId:r.accountId,date:next,note:r.note||'',recurringId:r.id,createdAt:Date.now()});
-      next=nextDate(next,r.frequency);changed=true;
+      const title=r.title||r.note||'';
+      D.transactions.push({id:uid(),type:r.type,amount:r.amount,categoryId:r.categoryId,accountId:r.accountId,date:next,note:title,recurringId:r.id,createdAt:Date.now()});
+      next=nextDateRec(next,r.frequency,r.dayOfMonth||null);
+      changed=true;
     }
     r.nextDate=next;
   });
@@ -1294,7 +1359,7 @@ function setupPinDots(){
 }
 
 function initLock(){
-  if(!D.settings.pin){unlock();return;}
+  if(!D.settings.pin||D.settings.pinEnabled===false){unlock();return;}
   pinBuf='';pinMode='verify';
   setupPinDots();
   updateDots();
@@ -1487,6 +1552,17 @@ function renderDash(){
 
 function txHtml(tx){
   if(tx.type==='transfer-in') return '';
+  if(tx.isFuture){
+    const cat=getCat(tx.categoryId,tx.type);const acc=getAcc(tx.accountId);
+    const sign=tx.type==='expense'?'-':'+';
+    const d=pDate(tx.date).toLocaleDateString('it-IT',{day:'2-digit',month:'short'});
+    return`<div class="txi txi-future">
+      <div class="txi-ic ${tx.type}" style="opacity:.6">${cat.emoji}</div>
+      <div class="txi-info"><div class="txi-cat">${cat.name} <span style="font-size:10px;color:var(--tt)">🔄 Prevista</span></div>
+      <div class="txi-meta"><span>${d}</span><span>·</span><span>${acc.emoji} ${acc.name}</span></div></div>
+      <div class="txi-amt ${tx.type}">${sign}${fmt(tx.amount)}</div>
+    </div>`;
+  }
   if(tx.type==='transfer-out'){
     const fromAcc=getAcc(tx.accountId);const toAcc=getAcc(tx.toAccountId||'');
     const d=pDate(tx.date).toLocaleDateString('it-IT',{day:'2-digit',month:'short'});
@@ -1500,9 +1576,10 @@ function txHtml(tx){
   const cat=getCat(tx.categoryId,tx.type);const acc=getAcc(tx.accountId);
   const sign=tx.type==='expense'?'-':'+';
   const d=pDate(tx.date).toLocaleDateString('it-IT',{day:'2-digit',month:'short'});
+  const hasReceipts=tx.receipts&&tx.receipts.length>0;
   return`<div class="txi" onclick="openEditTx('${tx.id}')">
     <div class="txi-ic ${tx.type}">${cat.emoji}</div>
-    <div class="txi-info"><div class="txi-cat">${cat.name}</div>
+    <div class="txi-info"><div class="txi-cat">${cat.name}${hasReceipts?'<span class="txi-badge">📎</span>':''}</div>
     <div class="txi-meta"><span>${d}</span><span>·</span><span>${acc.emoji} ${acc.name}</span>${tx.note?`<span>·</span><span style="font-style:italic;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tx.note}</span>`:''}</div></div>
     <div class="txi-amt ${tx.type}">${sign}${fmt(tx.amount)}</div>
   </div>`;
@@ -1513,9 +1590,45 @@ let txFilter='all',txPrdOff=0;
 function setTxF(f){txFilter=f;document.querySelectorAll('.fchip').forEach(el=>el.classList.toggle('act',el.dataset.f===f));renderTxList();}
 function txPrev(){txPrdOff--;renderTxList();}
 function txNext(){txPrdOff++;renderTxList();}
+function togFutureRec(){
+  D.settings.showFutureRec=!D.settings.showFutureRec;
+  saveData();
+  const chip=document.getElementById('fchip-future');
+  if(chip)chip.classList.toggle('act',D.settings.showFutureRec);
+  renderTxList();
+}
+function getFutureRec(start,end){
+  const td=today();
+  const futures=[];
+  (D.recurring||[]).forEach(r=>{
+    if(!r.active)return;
+    let next=r.nextDate||r.startDate;
+    const endStr=end.toISOString().split('T')[0];
+    const startStr=start.toISOString().split('T')[0];
+    let safety=0;
+    while(next<=endStr&&safety<200){
+      safety++;
+      if(next>td&&next>=startStr){
+        futures.push({
+          id:'future_'+r.id+'_'+next,
+          type:r.type,amount:r.amount,
+          categoryId:r.categoryId,accountId:r.accountId,
+          date:next,note:(r.title||r.note||'')+(r.title||r.note?' · ':'')+'Prevista',
+          isFuture:true,createdAt:0,receipts:[]
+        });
+      }
+      next=nextDateRec(next,r.frequency,r.dayOfMonth||null);
+    }
+  });
+  return futures;
+}
+
 function renderTxList(){
   const{start,end}=getMo(txPrdOff);
   document.getElementById('tx-prd-lbl').textContent=moLbl({start,end});
+  // Update future chip state
+  const chip=document.getElementById('fchip-future');
+  if(chip)chip.classList.toggle('act',!!D.settings.showFutureRec);
   let txs=D.transactions.filter(t=>{
     if(!inRng(t.date,start,end))return false;
     if(txFilter==='transfer'&&t.type!=='transfer-out')return false;
@@ -1523,7 +1636,18 @@ function renderTxList(){
     if(txFilter==='income'&&t.type!=='income')return false;
     if(txFilter==='all'&&t.type==='transfer-in')return false;
     return true;
-  }).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  });
+  // Add future recurring if toggle is on
+  if(D.settings.showFutureRec){
+    const futures=getFutureRec(start,end).filter(f=>{
+      if(txFilter==='expense')return f.type==='expense';
+      if(txFilter==='income')return f.type==='income';
+      if(txFilter==='transfer')return false;
+      return true;
+    });
+    txs=[...txs,...futures];
+  }
+  txs.sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0));
   const c=document.getElementById('tx-list');
   if(!txs.length){c.innerHTML='<div class="empty"><div class="empty-ic">🗂️</div><div class="empty-ttl">Nessuna transazione</div><div class="empty-sub">Non ci sono movimenti in questo periodo</div></div>';return;}
   const grps={};txs.forEach(t=>(grps[t.date]=grps[t.date]||[]).push(t));
@@ -1658,11 +1782,19 @@ function renderStats(){
   document.getElementById('st-prd-lbl').textContent=getPrdLbl({start,end});
   const{inc,exp}=prdTotalsFiltered(start,end,stAccFilter);
   const net=inc-exp;
-  animateCounter('st-inc',inc,false);
-  animateCounter('st-exp',exp,false);
+  const chip=document.getElementById('st-chip-rec');
+  if(chip)chip.classList.toggle('act',!!D.settings.showRecInStats);
+  let totalInc=inc,totalExp=exp;
+  if(D.settings.showRecInStats){
+    const recT=getRecTotalsForPeriod(start,end,stAccFilter);
+    totalInc+=recT.inc;totalExp+=recT.exp;
+  }
+  const net2=totalInc-totalExp;
+  animateCounter('st-inc',totalInc,false);
+  animateCounter('st-exp',totalExp,false);
   const netEl=document.getElementById('st-net');
-  netEl.style.color=net>=0?'var(--inc)':net<0?'var(--exp)':'';
-  animateCounter('st-net',Math.abs(net),false);
+  netEl.style.color=net2>=0?'var(--inc)':net2<0?'var(--exp)':'';
+  animateCounter('st-net',Math.abs(net2),false);
   renderPie(start,end,stAccFilter);renderBar(start,end,stAccFilter);renderLine(start,end,stAccFilter);
   renderComparison(start,end,stAccFilter);renderTopCats(start,end,stAccFilter);
 }
@@ -1867,8 +1999,10 @@ function openRecSh(id=null){
   recEditId=id;
   const r=id?D.recurring.find(x=>x.id===id):null;
   recType=r?r.type:'expense';
+  recSelDay=r?r.dayOfMonth||null:null;
   document.getElementById('sh-rec-ttl').textContent=id?'Modifica ricorrente':'Nuova ricorrente';
   document.getElementById('rec-del-btn').style.display=id?'':'none';
+  document.getElementById('rec-title').value=r?r.title||'':'';
   document.getElementById('rec-amt').value=r?r.amount:'';
   document.getElementById('rec-date').value=r?r.startDate:today();
   document.getElementById('rec-note').value=r?r.note||'':'';
@@ -1877,6 +2011,7 @@ function openRecSh(id=null){
   document.querySelectorAll('#ovl-rec .ty-btn').forEach(b=>b.classList.remove('act'));
   document.getElementById(recType==='expense'?'rt-exp':'rt-inc').classList.add('act');
   renderRecCats(r?r.categoryId:null);renderRecAccs(r?r.accountId:null);
+  updateRecDayPicker(r?r.dayOfMonth||null:null);
   openOvl('ovl-rec');
 }
 function setRecT(t){recType=t;document.querySelectorAll('#ovl-rec .ty-btn').forEach(b=>b.classList.remove('act'));document.getElementById(t==='expense'?'rt-exp':'rt-inc').classList.add('act');renderRecCats();}
@@ -1893,12 +2028,21 @@ function saveRec(){
   const accId=accEl.getAttribute('onclick').match(/'([^']+)'/)[1];
   const startDate=document.getElementById('rec-date').value||today();
   const freq=document.getElementById('rec-freq').value;
+  const title=document.getElementById('rec-title').value.trim();
   const note=document.getElementById('rec-note').value.trim();
+  const dayOfMonth=(freq==='monthly'||freq==='yearly')&&recSelDay?recSelDay:null;
   if(recEditId){
     const r=D.recurring.find(x=>x.id===recEditId);
-    if(r)Object.assign(r,{type:recType,amount:amt,categoryId:catId,accountId:accId,startDate,frequency:freq,note});
+    if(r)Object.assign(r,{type:recType,amount:amt,categoryId:catId,accountId:accId,startDate,frequency:freq,title,note,dayOfMonth});
   }else{
-    D.recurring.push({id:uid(),type:recType,amount:amt,categoryId:catId,accountId:accId,startDate,nextDate:startDate,frequency:freq,note,active:true});
+    let firstNext=startDate;
+    if(dayOfMonth){
+      const sd=new Date(startDate+'T00:00:00');
+      const last=new Date(sd.getFullYear(),sd.getMonth()+1,0).getDate();
+      sd.setDate(Math.min(dayOfMonth,last));
+      firstNext=sd.toISOString().split('T')[0];
+    }
+    D.recurring.push({id:uid(),type:recType,amount:amt,categoryId:catId,accountId:accId,startDate,nextDate:firstNext,frequency:freq,title,note,dayOfMonth,active:true});
     processRec();
   }
   saveData();closeOvl('ovl-rec');renderRecSub();renderSettings();
@@ -1969,6 +2113,10 @@ function renderPinSub(){
     <div class="fg"><div class="flbl">Nuovo PIN</div><input type="password" class="fi" id="pin-new" placeholder="${curLen===4?ph4:ph6}" maxlength="${curLen}" inputmode="numeric" pattern="[0-9]*"></div>
     <div class="fg"><div class="flbl">Conferma PIN</div><input type="password" class="fi" id="pin-conf" placeholder="${curLen===4?ph4:ph6}" maxlength="${curLen}" inputmode="numeric" pattern="[0-9]*"></div>
     <button class="btn btn-p" onclick="savePin()">Aggiorna PIN</button>
+    <div style="margin-top:10px;padding:12px 14px;background:var(--sf2);border:1px solid var(--bd);border-radius:var(--r);display:flex;align-items:center;justify-content:space-between;">
+      <div><div style="font-size:13px;font-weight:700">PIN attivo</div><div style="font-size:11px;color:var(--ts)">Disattiva per aprire senza PIN</div></div>
+      <div class="sw${D.settings.pinEnabled!==false?' on':''}" id="pin-enabled-sw" onclick="togPinEnabled()" style="flex-shrink:0"></div>
+    </div>
   </div>`;
 }
 function setPinLen(len){
@@ -2243,55 +2391,57 @@ let driveConnected=false,driveFileId=null,driveTokenClient=null,driveSyncTimer=n
 const DRIVE_FILE_ID_KEY='finanza_drive_file_id';
 const DRIVE_TOKEN_EXPIRY_KEY='finanza_drive_token_expiry';
 
+// Internal token storage
+let _driveAccessToken=null;
+function driveGetToken(){
+  const t=gapi.client.getToken();
+  return t?t.access_token:(_driveAccessToken||null);
+}
+
 function driveInit(){
   driveFileId=localStorage.getItem(DRIVE_FILE_ID_KEY)||null;
   gapi.load('client',async()=>{
-    await gapi.client.init({});
-    await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
-    // Init token client — used for both first login and silent refresh
+    try{
+      await gapi.client.init({});
+      await gapi.client.load('https://www.googleapis.com/discovery/v1/apis/drive/v3/rest');
+    }catch(e){console.warn('gapi init warning:',e);}
+    // Init token client
     driveTokenClient=google.accounts.oauth2.initTokenClient({
       client_id:CLIENT_ID,
       scope:DRIVE_SCOPE,
       callback:(resp)=>{
         if(resp.error){
-          // Silent refresh failed — try explicit login only if user initiated
-          if(resp.error==='interaction_required'||resp.error==='login_required'){
-            driveConnected=false;driveSetStatus('disconnected');renderSettings();
-          }else{
-            driveSetStatus('error');
-          }
+          if(resp.error==='interaction_required'||resp.error==='login_required'||resp.error==='access_denied'){
+            driveConnected=false;_driveAccessToken=null;driveSetStatus('disconnected');renderSettings();
+          }else{driveSetStatus('error');}
           return;
         }
-        // Token received — store with expiry (Google tokens last 3600s, refresh at 3000s)
+        _driveAccessToken=resp.access_token;
         driveConnected=true;
         const expiry=Date.now()+(resp.expires_in||3600)*1000;
         driveTokenExpiry=expiry;
         localStorage.setItem('finanza_drive_token',resp.access_token);
         localStorage.setItem(DRIVE_TOKEN_EXPIRY_KEY,String(expiry));
-        gapi.client.setToken({access_token:resp.access_token});
         driveSetStatus('connected');
         renderSettings();
-        // Schedule next silent refresh at 50 min (3000s)
         scheduleTokenRefresh(3000);
+        setTimeout(()=>{driveFirstSync();migrateExistingReceipts();},500);
       }
     });
     // Check stored token
     const storedToken=localStorage.getItem('finanza_drive_token');
     const storedExpiry=parseInt(localStorage.getItem(DRIVE_TOKEN_EXPIRY_KEY)||'0');
     if(storedToken){
-      const now=Date.now();
-      const remaining=storedExpiry-now;
+      const remaining=storedExpiry-Date.now();
       if(remaining>60000){
-        // Token still valid — use it directly
         gapi.client.setToken({access_token:storedToken});
+        _driveAccessToken=storedToken;
         driveConnected=true;driveTokenExpiry=storedExpiry;
         driveSetStatus('connected');renderSettings();
         driveSyncNow();
-        // Schedule refresh based on remaining time (or at 50min mark)
         const refreshIn=Math.max(0,Math.min(remaining-300000,3000000));
         scheduleTokenRefresh(refreshIn/1000);
       }else{
-        // Token expired or about to — try silent refresh
         driveSetStatus('syncing');
         driveSilentRefresh();
       }
@@ -2323,19 +2473,38 @@ function driveStatusClick(){
       driveDisconnect();
     });
   }else{
-    driveConnect();
+    // Update icon immediately to show feedback
+    driveSetStatus('syncing');
+    setTimeout(driveConnect,100);
   }
 }
 
 function driveConnect(){
-  if(!driveTokenClient){toast('⚠️ Google Drive non ancora caricato, riprova tra un momento');return;}
-  driveTokenClient.requestAccessToken({prompt:'consent'});
+  if(driveTokenClient){
+    driveTokenClient.requestAccessToken({prompt:'consent'});
+    return;
+  }
+  // Not ready yet — init and retry
+  driveSetStatus('syncing');
+  driveInit();
+  let attempts=0;
+  const retry=setInterval(()=>{
+    attempts++;
+    if(driveTokenClient){
+      clearInterval(retry);
+      driveTokenClient.requestAccessToken({prompt:'consent'});
+    }else if(attempts>=24){
+      clearInterval(retry);
+      driveSetStatus('disconnected');
+      toast('⚠️ Script Google non disponibili. Controlla la connessione e ricarica la pagina.');
+    }
+  },500);
 }
 
 function driveDisconnect(){
   google.accounts.oauth2.revoke(gapi.client.getToken()?.access_token||'',()=>{});
   gapi.client.setToken(null);
-  driveConnected=false;driveFileId=null;
+  driveConnected=false;driveFileId=null;_driveAccessToken=null;
   clearTimeout(driveRefreshTimer);
   localStorage.removeItem('finanza_drive_token');
   localStorage.removeItem(DRIVE_TOKEN_EXPIRY_KEY);
@@ -2364,7 +2533,7 @@ async function driveSyncNow(){
   if(!driveConnected)return;
   driveSetStatus('syncing');
   try{
-    const token=gapi.client.getToken();
+    const token=driveGetToken();
     if(!token){driveSetStatus('error');return;}
     localStorage.setItem('finanza_drive_token',token.access_token);
     const content=JSON.stringify(D,null,2);
@@ -2376,7 +2545,7 @@ async function driveSyncNow(){
       form.append('file',blob);
       const resp=await fetch(`https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=multipart`,{
         method:'PATCH',
-        headers:{Authorization:'Bearer '+token.access_token},
+        headers:{Authorization:'Bearer '+(token.access_token||token)},
         body:form
       });
       if(!resp.ok)throw new Error('Update failed: '+resp.status);
@@ -2387,7 +2556,7 @@ async function driveSyncNow(){
       form.append('file',blob);
       const resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
         method:'POST',
-        headers:{Authorization:'Bearer '+token.access_token},
+        headers:{Authorization:'Bearer '+(token.access_token||token)},
         body:form
       });
       if(!resp.ok)throw new Error('Create failed: '+resp.status);
@@ -2414,15 +2583,15 @@ async function driveSyncNow(){
 async function driveFirstSync(){
   // On first connect, check if a backup already exists on Drive
   try{
-    const token=gapi.client.getToken();
+    const token=driveGetToken();
     if(!token)return;
     // Search for existing file
-    const resp=await gapi.client.drive.files.list({
+    const fsResp=await gapi.client.drive.files.list({
       q:`name='${DRIVE_FILENAME}' and trashed=false`,
       fields:'files(id,name,modifiedTime)',
       spaces:'drive'
     });
-    const files=resp.result.files;
+    const files=fsResp.result.files;
     if(files&&files.length>0){
       const file=files[0];
       driveFileId=file.id;
@@ -2445,10 +2614,10 @@ async function driveFirstSync(){
 async function driveRestore(){
   try{
     driveSetStatus('syncing');
-    const token=gapi.client.getToken();
+    const token=driveGetToken();
     if(!token||!driveFileId){toast('⚠️ Nessun file da ripristinare');return;}
     const resp=await fetch(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`,{
-      headers:{Authorization:'Bearer '+token.access_token}
+      headers:{Authorization:'Bearer '+(token.access_token||token)}
     });
     if(!resp.ok)throw new Error('Download failed');
     const data=await resp.json();
@@ -2524,7 +2693,7 @@ function runSearch(){
       if(!hay.includes(q))return false;
     }
     return true;
-  }).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+  }).sort((a,b)=>b.date.localeCompare(a.date)||(b.createdAt||0)-(a.createdAt||0));
 
   const cnt=document.getElementById('srch-count');
   cnt.textContent=txs.length+' risultat'+(txs.length===1?'o':'i');
@@ -2542,21 +2711,77 @@ function runSearch(){
 // ── RECEIPTS ────────────────────────────────────────────────────────────────
 window._pendingReceipts=[];
 
+// ── RECEIPT NAME GENERATOR ────────────────────────────────────────────────
+function buildReceiptName(txCtx, fileExt){
+  // Get transaction context for naming: Date_Type_Account_Amount
+  let date=today(),typeStr='Allegato',accName='',amtStr='';
+  if(txCtx==='tx'){
+    const dateEl=document.getElementById('tx-date');
+    if(dateEl&&dateEl.value)date=dateEl.value;
+    const typeEl=document.querySelector('#ovl-tx .ty-btn.act');
+    if(typeEl)typeStr=typeEl.textContent.includes('Spesa')?'Uscita':'Entrata';
+    const accEl=document.querySelector('#tx-accs .as-it.sel');
+    if(accEl){const nm=accEl.querySelector('.as-nm');if(nm)accName=nm.textContent.replace(/\s+/g,'');}
+    const amtEl=document.getElementById('tx-amt');
+    if(amtEl&&amtEl.value)amtStr=parseFloat(amtEl.value).toFixed(2);
+  }
+  const parts=[date,typeStr,accName,amtStr].filter(Boolean);
+  return parts.join('_')+(fileExt?'.'+fileExt:'');
+}
+
+// ── COMPRESS IMAGE ─────────────────────────────────────────────────────────
+async function compressImage(dataUrl, maxW, quality){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      let w=img.width,h=img.height;
+      if(w>maxW){h=Math.round(h*maxW/w);w=maxW;}
+      const canvas=document.createElement('canvas');
+      canvas.width=w;canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      res(canvas.toDataURL('image/jpeg',quality));
+    };
+    img.src=dataUrl;
+  });
+}
+
+// ── RENDER RECEIPT THUMBNAILS ──────────────────────────────────────────────
 function renderReceiptThumbs(ctx, receipts){
   const row=document.getElementById(ctx+'-rcpts');
   if(!row)return;
   row.innerHTML='';
   (receipts||[]).forEach((r,i)=>{
-    const wrap=document.createElement('div');wrap.style.position='relative';
+    const wrap=document.createElement('div');
+    wrap.style.position='relative';
+    wrap.className=r.uploading?'rcpt-uploading':'';
     if(r.type==='pdf'){
-      wrap.innerHTML=`<div class="rcpt-thumb-pdf" onclick="viewReceipt('${ctx}',${i})"><span>📄</span><span>PDF</span></div>`;
+      const d=document.createElement('div');
+      d.className='rcpt-thumb-pdf';
+      d.innerHTML='<span>📄</span><span>PDF</span>';
+      d.onclick=()=>viewReceipt(ctx,i);
+      wrap.appendChild(d);
     }else{
-      wrap.innerHTML=`<img class="rcpt-thumb" src="${r.dataUrl||r.driveUrl||''}" onclick="viewReceipt('${ctx}',${i})">`;
+      const src=r.dataUrl||'';
+      const d=document.createElement('div');
+      d.style.cssText='width:64px;height:64px;border-radius:10px;overflow:hidden;border:1.5px solid var(--bd);cursor:pointer;background:var(--sf2);display:flex;align-items:center;justify-content:center;font-size:22px;';
+      if(src){const img=document.createElement('img');img.src=src;img.style.cssText='width:100%;height:100%;object-fit:cover;';d.appendChild(img);}
+      else d.textContent='🖼️';
+      d.onclick=()=>viewReceipt(ctx,i);
+      wrap.appendChild(d);
+    }
+    if(r.uploading){
+      const spin=document.createElement('div');
+      spin.className='rcpt-spin';
+      spin.innerHTML='<span class="rcpt-spin-icon">⟳</span>';
+      wrap.appendChild(spin);
     }
     const del=document.createElement('div');
-    del.style.cssText='position:absolute;top:-5px;right:-5px;width:18px;height:18px;background:var(--exp);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;color:#fff;font-weight:800;';
-    del.textContent='×';del.onclick=(e)=>{e.stopPropagation();removeReceipt(ctx,i);};
-    wrap.appendChild(del);row.appendChild(wrap);
+    del.style.cssText='position:absolute;top:-5px;right:-5px;width:18px;height:18px;background:var(--exp);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;cursor:pointer;color:#fff;font-weight:800;z-index:2;';
+    del.textContent='x';
+    const ii=i;
+    del.onclick=(e)=>{e.stopPropagation();removeReceipt(ctx,ii);};
+    wrap.appendChild(del);
+    row.appendChild(wrap);
   });
   const addBtn=document.createElement('div');
   addBtn.className='rcpt-add';addBtn.textContent='+';
@@ -2567,7 +2792,7 @@ function renderReceiptThumbs(ctx, receipts){
 function removeReceipt(ctx,idx){
   if(ctx==='tx'&&txEditId){
     const tx=D.transactions.find(t=>t.id===txEditId);
-    if(tx&&tx.receipts){tx.receipts.splice(idx,1);renderReceiptThumbs(ctx,tx.receipts);}
+    if(tx&&tx.receipts){tx.receipts.splice(idx,1);saveData();renderReceiptThumbs(ctx,tx.receipts);}
   }else{
     if(window._pendingReceipts)window._pendingReceipts.splice(idx,1);
     renderReceiptThumbs(ctx,window._pendingReceipts||[]);
@@ -2579,22 +2804,38 @@ function viewReceipt(ctx,idx){
   if(ctx==='tx'&&txEditId){const tx=D.transactions.find(t=>t.id===txEditId);receipts=tx?tx.receipts||[]:[]}
   else receipts=window._pendingReceipts||[];
   const r=receipts[idx];if(!r)return;
-  if(r.type==='pdf'){
-    const a=document.createElement('a');a.href=r.dataUrl;a.download=r.name||'ricevuta.pdf';a.click();
+  if(r.driveFileId){
+    // Open directly from Drive
+    window.open('https://drive.google.com/file/d/'+r.driveFileId+'/view','_blank');
+  }else if(r.dataUrl){
+    if(r.type==='pdf'){
+      const a=document.createElement('a');a.href=r.dataUrl;a.download=r.name||'ricevuta.pdf';a.click();
+    }else{
+      const w=window.open('','_blank');
+      if(w){w.document.write('<html><body style="margin:0;background:#000"><img src="'+r.dataUrl+'" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>');w.document.close();}
+    }
   }else{
-    const w=window.open('','_blank');
-    if(w){w.document.write(`<html><body style="margin:0;background:#000"><img src="${r.dataUrl||r.driveUrl}" style="max-width:100%;max-height:100vh;display:block;margin:auto"></body></html>`);w.document.close();}
+    toast('Foto non disponibile');
   }
 }
 
 async function addReceipts(ctx, input){
   const files=Array.from(input.files);if(!files.length)return;
   if(!window._pendingReceipts)window._pendingReceipts=[];
-  toast('📎 Caricamento allegati...');
   for(const file of files){
     const isPdf=file.type==='application/pdf';
-    const dataUrl=await new Promise(res=>{const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);});
-    const rcpt={id:uid(),name:file.name,type:isPdf?'pdf':'image',dataUrl,driveFileId:null};
+    toast('Compressione in corso...');
+    // Read file
+    const rawDataUrl=await new Promise(res=>{
+      const r=new FileReader();r.onload=e=>res(e.target.result);r.readAsDataURL(file);
+    });
+    // Compress images, keep PDFs as-is
+    const dataUrl=isPdf?rawDataUrl:await compressImage(rawDataUrl,1200,0.8);
+    // Build meaningful name
+    const ext=isPdf?'pdf':'jpg';
+    const name=buildReceiptName(ctx,ext);
+    const rcpt={id:uid(),name,type:isPdf?'pdf':'image',dataUrl,driveFileId:null,uploading:false};
+    // Add to list
     if(ctx==='tx'&&txEditId){
       const tx=D.transactions.find(t=>t.id===txEditId);
       if(tx){if(!tx.receipts)tx.receipts=[];tx.receipts.push(rcpt);renderReceiptThumbs(ctx,tx.receipts);}
@@ -2602,41 +2843,90 @@ async function addReceipts(ctx, input){
       window._pendingReceipts.push(rcpt);
       renderReceiptThumbs(ctx,window._pendingReceipts);
     }
-    // Upload to Drive if connected
-    if(driveConnected)await uploadReceiptToDrive(rcpt);
+    if(driveConnected){
+      // Show spinner
+      rcpt.uploading=true;
+      renderReceiptThumbs(ctx,ctx==='tx'&&txEditId?D.transactions.find(t=>t.id===txEditId)?.receipts||[]:window._pendingReceipts||[]);
+      await uploadReceiptToDrive(rcpt,name);
+      rcpt.uploading=false;
+      if(ctx==='tx'&&txEditId)saveData();
+      renderReceiptThumbs(ctx,ctx==='tx'&&txEditId?D.transactions.find(t=>t.id===txEditId)?.receipts||[]:window._pendingReceipts||[]);
+    }else{
+      toast('Drive non connesso: foto salvata temporaneamente in locale');
+    }
   }
   input.value='';
-  if(ctx==='tx'&&txEditId)saveData();
-  toast('✅ Allegati aggiunti');
+  toast('Allegati pronti');
 }
 
-async function uploadReceiptToDrive(rcpt){
+async function uploadReceiptToDrive(rcpt, customName){
   try{
-    const token=gapi.client.getToken();if(!token)return;
-    // Ensure folder exists
+    const t=gapi.client.getToken();if(!t||!t.access_token)return false;const token=t;
     const folderId=await getDriveFolderId('Finanza/Ricevute');
+    if(!folderId)return false;
     const blob=dataURLtoBlob(rcpt.dataUrl);
+    const fileName=customName||rcpt.name||rcpt.id;
     const form=new FormData();
-    form.append('metadata',new Blob([JSON.stringify({name:rcpt.name||rcpt.id,parents:[folderId]})],{type:'application/json'}));
+    form.append('metadata',new Blob([JSON.stringify({name:fileName,parents:[folderId]})],{type:'application/json'}));
     form.append('file',blob);
     const resp=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',{
-      method:'POST',headers:{Authorization:'Bearer '+token.access_token},body:form
+      method:'POST',headers:{Authorization:'Bearer '+(token.access_token||token)},body:form
     });
-    if(resp.ok){const d=await resp.json();rcpt.driveFileId=d.id;delete rcpt.dataUrl;}
+    if(resp.ok){
+      const d=await resp.json();
+      rcpt.driveFileId=d.id;
+      delete rcpt.dataUrl; // Remove from JSON to keep it light
+      delete rcpt.pendingMigration;
+      return true;
+    }
   }catch(e){console.error('Receipt upload error:',e);}
+  return false;
+}
+
+// ── AUTO-MIGRATE EXISTING RECEIPTS ─────────────────────────────────────────
+async function migrateExistingReceipts(){
+  if(!driveConnected||D.receiptsMigrated)return;
+  const toMigrate=[];
+  D.transactions.forEach(tx=>{
+    (tx.receipts||[]).forEach(r=>{
+      if(r.pendingMigration&&r.dataUrl)toMigrate.push({tx,r});
+    });
+  });
+  if(!toMigrate.length){D.receiptsMigrated=true;saveData();return;}
+  toast('Migrazione foto su Drive in corso...');
+  let done=0;
+  for(const{tx,r} of toMigrate){
+    const ok=await uploadReceiptToDrive(r,r.name||buildMigrationName(tx,r));
+    if(ok)done++;
+  }
+  D.receiptsMigrated=true;
+  saveData();
+  if(done>0)toast('Migrate '+done+' foto su Drive');
+}
+
+function buildMigrationName(tx,r){
+  const typeStr=tx.type==='expense'?'Uscita':'Entrata';
+  const acc=getAcc(tx.accountId);
+  const accName=(acc.name||'').replace(/\s+/g,'');
+  const amtStr=parseFloat(tx.amount).toFixed(2);
+  return tx.date+'_'+typeStr+'_'+accName+'_'+amtStr+(r.type==='pdf'?'.pdf':'.jpg');
 }
 
 async function getDriveFolderId(path){
-  const token=gapi.client.getToken();if(!token)return null;
+  const t=gapi.client.getToken();if(!t||!t.access_token)return null;
   const parts=path.split('/');let parentId='root';
   for(const part of parts){
     const resp=await gapi.client.drive.files.list({
       q:`name='${part}' and mimeType='application/vnd.google-apps.folder' and '${parentId}' in parents and trashed=false`,
       fields:'files(id)'
     });
-    if(resp.result.files&&resp.result.files.length>0){parentId=resp.result.files[0].id;}
-    else{
-      const cr=await gapi.client.drive.files.create({resource:{name:part,mimeType:'application/vnd.google-apps.folder',parents:[parentId]},fields:'id'});
+    if(resp.result.files&&resp.result.files.length>0){
+      parentId=resp.result.files[0].id;
+    }else{
+      const cr=await gapi.client.drive.files.create({
+        resource:{name:part,mimeType:'application/vnd.google-apps.folder',parents:[parentId]},
+        fields:'id'
+      });
       parentId=cr.result.id;
     }
   }
@@ -2869,12 +3159,34 @@ function saveDebt(){
   if(!D.debts)D.debts=[];
   if(debtEditId){
     const d=D.debts.find(x=>x.id===debtEditId);
-    if(d)Object.assign(d,{person,amount:amt,note,date,direction:debtDir});
+    if(d){
+      const oldAmt=d.amount;
+      Object.assign(d,{person,amount:amt,note,date,direction:debtDir});
+      // If direction is 'owe' and amount changed, update linked tx
+      if(debtDir==='owe'&&d.linkedTxId&&Math.abs(oldAmt-amt)>0.001){
+        const tx=D.transactions.find(t=>t.id===d.linkedTxId);
+        if(tx)tx.amount=amt;
+      }
+    }
+    saveData();closeOvl('ovl-debt');renderGroups();
+    toast('✅ Debito aggiornato');
   }else{
-    D.debts.push({id:uid(),person,amount:amt,paid:0,note,date,direction:debtDir,settlements:[]});
+    const newDebtId=uid();
+    const newDebt={id:newDebtId,person,amount:amt,paid:0,note,date,direction:debtDir,settlements:[],linkedTxId:null};
+    D.debts.push(newDebt);
+    saveData();closeOvl('ovl-debt');
+    if(debtDir==='owe'){
+      // I owe someone — open picker to register expense
+      openGrpTxPicker('expense',amt,'Debito verso '+person,date,(txId)=>{
+        const d2=D.debts.find(x=>x.id===newDebtId);
+        if(d2)d2.linkedTxId=txId;
+        saveData();renderGroups();
+      });
+    }else{
+      renderGroups();
+      toast('✅ Debito salvato');
+    }
   }
-  saveData();closeOvl('ovl-debt');renderGroups();
-  toast(debtEditId?'✅ Debito aggiornato':'✅ Debito salvato');
 }
 function delDebt(){
   confirm2('Elimina debito','Il debito verrà rimosso definitivamente.',()=>{
@@ -3518,8 +3830,20 @@ const TOUR_STEPS=[
 let tourStep=0,tourActive=false;
 
 function showOnboarding(){
-  if(!D.tour||(!D.tour.completed&&!D.tour.skipped)){
+  const needTour=!D.tour||(!D.tour.completed&&!D.tour.skipped);
+  // pinEnabled is set in migration for existing users — only undefined for brand new installs
+  const needPin=D.settings.pinEnabled===undefined;
+  if(needTour){
     document.getElementById('ovl-onboarding').style.display='flex';
+    const tb=document.getElementById('onb-tour-box');if(tb)tb.style.display='';
+    const pb=document.getElementById('onb-pin-box');if(pb)pb.style.display='none';
+  }else if(needPin){
+    document.getElementById('ovl-onboarding').style.display='flex';
+    const tb=document.getElementById('onb-tour-box');if(tb)tb.style.display='none';
+    const pb=document.getElementById('onb-pin-box');if(pb)pb.style.display='';
+  }else{
+    // Nothing to show — make sure overlay is hidden
+    document.getElementById('ovl-onboarding').style.display='none';
   }
 }
 function startTour(){
@@ -3529,12 +3853,17 @@ function startTour(){
   showTourStep();
 }
 function skipTour(){
-  document.getElementById('ovl-onboarding').style.display='none';
   document.getElementById('tour-overlay').classList.remove('active');
   tourActive=false;
   if(!D.tour)D.tour={};
   D.tour.skipped=true;
   saveData();
+  if(D.settings.pinEnabled===undefined){
+    const tb=document.getElementById('onb-tour-box');if(tb)tb.style.display='none';
+    const pb=document.getElementById('onb-pin-box');if(pb)pb.style.display='';
+  }else{
+    document.getElementById('ovl-onboarding').style.display='none';
+  }
 }
 function tourNext(){
   if(tourStep<TOUR_STEPS.length-1){tourStep++;showTourStep();}
@@ -3550,6 +3879,7 @@ function finishTour(){
   D.tour.completed=true;D.tour.skipped=false;
   saveData();
   toast('Tour completato! Ritrovi la guida nelle Impostazioni.');
+  setTimeout(showPinOnboarding,500);
 }
 function showTourStep(){
   const step=TOUR_STEPS[tourStep];if(!step)return;
@@ -3615,6 +3945,83 @@ function animateCounter(elId,targetVal){
     else el.textContent=fmt(targetVal);
   }
   requestAnimationFrame(tick);
+}
+
+
+// ── DAY PICKER ────────────────────────────────────────────────────────────
+let recSelDay=null;
+function updateRecDayPicker(selDay){
+  const freq=document.getElementById('rec-freq').value;
+  const sec=document.getElementById('rec-day-sec');
+  if(freq==='monthly'||freq==='yearly'){
+    sec.style.display='';
+    renderRecDayGrid(selDay!==undefined?selDay:recSelDay);
+  }else{
+    sec.style.display='none';
+    recSelDay=null;
+  }
+}
+function renderRecDayGrid(selDay){
+  recSelDay=(selDay!==undefined)?selDay:recSelDay;
+  const grid=document.getElementById('rec-day-grid');if(!grid)return;
+  let out='';
+  for(let d=1;d<=31;d++){
+    out+='<div class="day-cell'+(recSelDay===d?' sel':'')+'" onclick="selRecDay('+d+')">'+d+'</div>';
+  }
+  grid.innerHTML=out;
+}
+function selRecDay(d){recSelDay=(recSelDay===d)?null:d;renderRecDayGrid();}
+
+// ── STATS RECURRING ───────────────────────────────────────────────────────
+function togStRec(){
+  D.settings.showRecInStats=!D.settings.showRecInStats;saveData();
+  const chip=document.getElementById('st-chip-rec');
+  if(chip)chip.classList.toggle('act',!!D.settings.showRecInStats);
+  renderStats();
+}
+function getRecTotalsForPeriod(start,end,accId){
+  let inc=0,exp=0;
+  const startStr=start.toISOString().split('T')[0];
+  const endStr=end.toISOString().split('T')[0];
+  const td=today();
+  (D.recurring||[]).forEach(r=>{
+    if(!r.active)return;
+    if(accId&&r.accountId!==accId)return;
+    let next=r.nextDate||r.startDate;
+    let safety=0;
+    while(next<=endStr&&safety<200){
+      safety++;
+      if(next>=startStr&&next>td){r.type==='income'?inc+=Number(r.amount):exp+=Number(r.amount);}
+      next=nextDateRec(next,r.frequency,r.dayOfMonth||null);
+    }
+  });
+  return{inc,exp};
+}
+
+// ── PIN OPTIONAL ──────────────────────────────────────────────────────────
+function togPinEnabled(){
+  if(!D.settings.pin){toast('Imposta prima un PIN');return;}
+  D.settings.pinEnabled=!D.settings.pinEnabled;
+  const sw=document.getElementById('pin-enabled-sw');
+  if(sw)sw.className='sw'+(D.settings.pinEnabled?' on':'');
+  saveData();
+  toast(D.settings.pinEnabled?'PIN attivato':'PIN disattivato');
+}
+function onbEnablePin(){
+  document.getElementById('ovl-onboarding').style.display='none';
+  D.settings.pinEnabled=true;saveData();
+  showScr('settings');setTimeout(()=>navigate('sub-pin'),300);
+}
+function onbSkipPin(){
+  document.getElementById('ovl-onboarding').style.display='none';
+  D.settings.pinEnabled=false;saveData();
+}
+function showPinOnboarding(){
+  if(D.settings.pinEnabled===undefined){
+    document.getElementById('ovl-onboarding').style.display='flex';
+    const tb=document.getElementById('onb-tour-box');if(tb)tb.style.display='none';
+    const pb=document.getElementById('onb-pin-box');if(pb)pb.style.display='';
+  }
 }
 
 // ── OVERLAY HELPERS ────────────────────────────────────────────────────────
