@@ -1,9 +1,9 @@
-[README.md](https://github.com/user-attachments/files/26353925/README.md)
+[README.md](https://github.com/user-attachments/files/26372837/README.md)
 # 🪙 PECUNIA — Gestione Finanziaria Personale
 
 > App web progressiva (PWA) per la gestione delle finanze personali. Single-file HTML, deployata su GitHub Pages con sincronizzazione automatica su Google Drive.
 
-**🔗 Link app:** [https://bymo03.github.io/FinanzaAPP](https://bymo03.github.io/FinanzaAPP)
+**🔗 Link app:** [https://bymo03.github.io/PECUNIA](https://bymo03.github.io/PECUNIA)
 
 ---
 
@@ -78,6 +78,14 @@ La schermata principale mostra una panoramica completa delle tue finanze.
 - **Risparmio mensile** — mostrato quando le spese sono sotto il budget
 - **Conti** — chip scorrevoli con saldo aggiornato per ogni conto
 - **Ultimi movimenti** — le transazioni più recenti
+
+### Riordino conti
+Tieni premuto a lungo su un chip conto per attivare la **modalità riordino**:
+- Lo sfondo della riga cambia colore e appaiono le maniglie ☰ su ogni chip
+- Trascina i chip nella posizione desiderata
+- Tocca fuori dalla riga conti per uscire e salvare automaticamente
+- L'ordine è salvato su Google Drive e persiste tra le sessioni
+- La sezione Impostazioni → Conti mantiene sempre l'ordine originale di creazione
 
 ### Banner anagrafica
 Se il profilo (nome e cognome) non è ancora compilato, appare un banner in cima che invita a completarlo. Serve principalmente per i Gruppi. Tocca il banner per andare direttamente alla sezione Anagrafica.
@@ -252,7 +260,7 @@ Ogni transazione può avere allegati (scontrini, ricevute, PDF).
 3. Accedi con il tuo account Google e autorizza l'app
 4. La sincronizzazione è automatica ad ogni modifica
 
-> ⚠️ **Importante:** l'autenticazione Google funziona **solo da URL HTTPS** (`https://bymo03.github.io/FinanzaAPP`). Aprire il file HTML in locale causa l'errore `400: invalid_request`.
+> ⚠️ **Importante:** l'autenticazione Google funziona **solo da URL HTTPS** (`https://bymo03.github.io/PECUNIA`). Aprire il file HTML in locale causa l'errore `400: invalid_request`.
 
 ### Struttura su Drive
 ```
@@ -313,7 +321,11 @@ Su mobile (Chrome/Safari) tocca il menu del browser → *"Aggiungi alla schermat
 
 ## Changelog
 
-### v2.0 (corrente)
+### v2.1 (corrente)
+- Riordino conti sulla dashboard con drag & drop (long press per attivare)
+- Ordine conti salvato su Google Drive (schema v9)
+
+### v2.0 (legacy)
 - Rinomina da "Finanza" a **PECUNIA**
 - Schermata di blocco completamente ridisegnata (particelle, monetina animata, ripple dorato)
 - Feedback aptico su PIN
