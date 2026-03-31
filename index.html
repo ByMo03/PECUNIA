@@ -215,6 +215,15 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 .item-sb{font-size:11px;color:var(--tt);margin-top:1px;}
 .item-val{font-size:14px;font-weight:700;}
 @media(max-width:360px){.cat-grid{grid-template-columns:repeat(3,1fr);}}
+/* ACCOUNT REORDER */
+.acc-scroll.reorder-mode{background:var(--sf2);border-radius:var(--r);padding:8px;transition:background .2s;}
+.acc-chip.dragging{opacity:.4;transform:scale(.96);}
+.acc-chip.drag-over{border-color:var(--acc);background:var(--acc-g);}
+.acc-chip-handle{display:none;font-size:16px;color:var(--tt);margin-bottom:4px;cursor:grab;}
+.reorder-mode .acc-chip-handle{display:block;}
+.reorder-mode .acc-chip{cursor:grab;user-select:none;}
+.reorder-mode .acc-chip:active{cursor:grabbing;}
+.d-sec-lnk-reorder{font-size:12px;color:var(--acc);cursor:pointer;padding:3px 8px;border:1px solid var(--acc);border-radius:var(--rs);font-weight:700;}
 .day-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:6px;}
 .day-cell{height:36px;border-radius:var(--rs);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;cursor:pointer;background:var(--sf2);color:var(--ts);border:1.5px solid transparent;transition:all .15s;}
 .day-cell:active{transform:scale(.92);}
@@ -543,7 +552,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
         </div>
       </div>
       <div class="d-sec" style="margin-top:16px;">
-        <div class="d-sec-hdr"><div class="d-sec-ttl">Conti</div><div class="d-sec-lnk" onclick="navigate('sub-acc')">Gestisci</div></div>
+        <div class="d-sec-hdr"><div class="d-sec-ttl">Conti</div><div style="display:flex;gap:8px;align-items:center;"><div class="d-sec-lnk-reorder" id="d-acc-reorder-btn" style="display:none" onclick="exitReorderMode()">Fine</div><div class="d-sec-lnk" onclick="navigate('sub-acc')">Gestisci</div></div></div>
         <div class="acc-scroll" id="d-accs"></div>
       </div>
       <div class="d-sec" style="margin-top:16px;">
@@ -1060,7 +1069,7 @@ select.fi{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=
 const SK='finanza_v1';
 const CLIENT_ID='472780980276-j7tadqv8v4f33thsnpkfhlggmrssmoee.apps.googleusercontent.com';
 const DRIVE_SCOPE='https://www.googleapis.com/auth/drive.file';
-const SCHEMA_VERSION=8;
+const SCHEMA_VERSION=9;
 const DRIVE_FILENAME='finanza_backup.json';
 const DEF_EXP_CATS=[
   {id:'ce1',name:'Cibo',emoji:'🍔',custom:false},{id:'ce2',name:'Ristorante',emoji:'🍽️',custom:false},
@@ -1140,9 +1149,12 @@ function migrateData(d){
     if(d.recurring)d.recurring.forEach(r=>{if(!r.title)r.title='';});
     if(d.settings){
       if(d.settings.showRecInStats===undefined)d.settings.showRecInStats=false;
-      // Set pinEnabled based on whether user has a PIN — critical for lock screen
       if(d.settings.pinEnabled===undefined)d.settings.pinEnabled=!!(d.settings.pin);
     }
+  }
+  if((d.schemaVersion||1) < 9){
+    // Add account order array (stores account IDs in display order)
+    if(!d.accountOrder)d.accountOrder=[];
   }
   d.schemaVersion=SCHEMA_VERSION;
   return d;
@@ -1159,7 +1171,8 @@ function initData(){
     categories:{expense:[...DEF_EXP_CATS],income:[...DEF_INC_CATS]},
     transactions:[],recurring:[],contacts:[],debts:[],groups:[],
     profile:{firstName:'',lastName:'',phone:'',profileBannerDismissed:false},
-    tour:{completed:false,skipped:false}
+    tour:{completed:false,skipped:false},
+    accountOrder:[]
   };
   saveData();
 }
@@ -1535,10 +1548,13 @@ function renderDash(){
   }else bSec.style.display='none';
   // Accounts chips
   const ae=document.getElementById('d-accs');ae.innerHTML='';
-  D.accounts.forEach(acc=>{
-    const ch=document.createElement('div');ch.className='acc-chip';
-    ch.innerHTML=`<div class="acc-chip-ic">${acc.emoji}</div><div class="acc-chip-nm">${acc.name}</div><div class="acc-chip-bl" style="color:${acc.color}">${fmt(accBal(acc.id))}</div>`;
-    ch.onclick=()=>navigate('sub-acc');ae.appendChild(ch);
+  // Get ordered accounts (use accountOrder if set, else default order)
+  const orderedAccs=getOrderedAccounts();
+  orderedAccs.forEach(acc=>{
+    const ch=document.createElement('div');ch.className='acc-chip';ch.dataset.accId=acc.id;
+    ch.innerHTML='<div class="acc-chip-handle">☰</div><div class="acc-chip-ic">'+acc.emoji+'</div><div class="acc-chip-nm">'+acc.name+'</div><div class="acc-chip-bl" style="color:'+acc.color+'">'+fmt(accBal(acc.id))+'</div>';
+    setupAccChipLongPress(ch,acc);
+    ae.appendChild(ch);
   });
   const add=document.createElement('div');add.className='acc-chip';
   add.style.cssText='display:flex;align-items:center;justify-content:center;min-width:72px;border-style:dashed;color:var(--tt);font-size:28px;font-weight:300;';
@@ -4023,6 +4039,122 @@ function showPinOnboarding(){
     const pb=document.getElementById('onb-pin-box');if(pb)pb.style.display='';
   }
 }
+
+
+// ── ACCOUNT REORDER ───────────────────────────────────────────────────────────
+let accReorderMode=false,dragSrcId=null;
+
+function getOrderedAccounts(){
+  const order=D.accountOrder||[];
+  if(!order.length)return D.accounts;
+  // Sort accounts by order array, append any new accounts at end
+  const ordered=[];
+  order.forEach(id=>{const a=D.accounts.find(x=>x.id===id);if(a)ordered.push(a);});
+  D.accounts.forEach(a=>{if(!ordered.find(x=>x.id===a.id))ordered.push(a);});
+  return ordered;
+}
+
+function setupAccChipLongPress(chip,acc){
+  let timer=null;
+  const start=()=>{timer=setTimeout(()=>enterReorderMode(),500);};
+  const cancel=()=>{clearTimeout(timer);};
+  chip.addEventListener('touchstart',start,{passive:true});
+  chip.addEventListener('touchend',cancel);
+  chip.addEventListener('touchmove',cancel,{passive:true});
+  chip.addEventListener('mousedown',start);
+  chip.addEventListener('mouseup',cancel);
+  chip.addEventListener('mouseleave',cancel);
+  // Click only when not in reorder mode
+  chip.addEventListener('click',()=>{if(!accReorderMode)navigate('sub-acc');});
+  // Drag events
+  chip.setAttribute('draggable','true');
+  chip.addEventListener('dragstart',e=>{
+    if(!accReorderMode){e.preventDefault();return;}
+    dragSrcId=acc.id;
+    chip.classList.add('dragging');
+    e.dataTransfer.effectAllowed='move';
+  });
+  chip.addEventListener('dragend',()=>chip.classList.remove('dragging'));
+  chip.addEventListener('dragover',e=>{
+    if(!accReorderMode)return;
+    e.preventDefault();e.dataTransfer.dropEffect='move';
+    chip.classList.add('drag-over');
+  });
+  chip.addEventListener('dragleave',()=>chip.classList.remove('drag-over'));
+  chip.addEventListener('drop',e=>{
+    if(!accReorderMode||!dragSrcId)return;
+    e.preventDefault();
+    chip.classList.remove('drag-over');
+    if(dragSrcId===acc.id)return;
+    // Reorder
+    const ordered=getOrderedAccounts();
+    const fromIdx=ordered.findIndex(a=>a.id===dragSrcId);
+    const toIdx=ordered.findIndex(a=>a.id===acc.id);
+    if(fromIdx<0||toIdx<0)return;
+    const moved=ordered.splice(fromIdx,1)[0];
+    ordered.splice(toIdx,0,moved);
+    D.accountOrder=ordered.map(a=>a.id);
+    saveData();
+    renderDash();
+  });
+  // Touch drag (mobile)
+  let touchDragAcc=null,touchClone=null;
+  chip.addEventListener('touchstart',e=>{if(!accReorderMode)return;touchDragAcc=acc.id;},{passive:true});
+  chip.addEventListener('touchmove',e=>{
+    if(!accReorderMode||!touchDragAcc)return;
+    e.preventDefault();
+    const t=e.touches[0];
+    const el=document.elementFromPoint(t.clientX,t.clientY);
+    const target=el?el.closest('.acc-chip[data-acc-id]'):null;
+    document.querySelectorAll('.acc-chip').forEach(c=>c.classList.remove('drag-over'));
+    if(target&&target.dataset.accId!==touchDragAcc)target.classList.add('drag-over');
+  },{passive:false});
+  chip.addEventListener('touchend',e=>{
+    if(!accReorderMode||!touchDragAcc)return;
+    const t=e.changedTouches[0];
+    const el=document.elementFromPoint(t.clientX,t.clientY);
+    const target=el?el.closest('.acc-chip[data-acc-id]'):null;
+    document.querySelectorAll('.acc-chip').forEach(c=>c.classList.remove('drag-over'));
+    if(target&&target.dataset.accId&&target.dataset.accId!==touchDragAcc){
+      const ordered=getOrderedAccounts();
+      const fromIdx=ordered.findIndex(a=>a.id===touchDragAcc);
+      const toIdx=ordered.findIndex(a=>a.id===target.dataset.accId);
+      if(fromIdx>=0&&toIdx>=0){
+        const moved=ordered.splice(fromIdx,1)[0];
+        ordered.splice(toIdx,0,moved);
+        D.accountOrder=ordered.map(a=>a.id);
+        saveData();
+        renderDash();
+      }
+    }
+    touchDragAcc=null;
+  });
+}
+
+function enterReorderMode(){
+  accReorderMode=true;
+  const ae=document.getElementById('d-accs');
+  if(ae)ae.classList.add('reorder-mode');
+  const btn=document.getElementById('d-acc-reorder-btn');
+  if(btn)btn.style.display='';
+  haptic('tap');
+  toast('Trascina i conti per riordinarli');
+}
+
+function exitReorderMode(){
+  accReorderMode=false;
+  const ae=document.getElementById('d-accs');
+  if(ae)ae.classList.remove('reorder-mode');
+  const btn=document.getElementById('d-acc-reorder-btn');
+  if(btn)btn.style.display='none';
+}
+
+// Exit reorder when tapping outside acc-scroll
+document.addEventListener('click',e=>{
+  if(!accReorderMode)return;
+  const ae=document.getElementById('d-accs');
+  if(ae&&!ae.contains(e.target)){exitReorderMode();}
+});
 
 // ── OVERLAY HELPERS ────────────────────────────────────────────────────────
 function openOvl(id){document.getElementById(id).classList.add('open');}
